@@ -975,10 +975,23 @@ const ManageBooks = () => {
             <CardHeader className="pb-4">
               <div className="flex justify-between items-start">
                 <div className="flex-1 min-w-0">
-                  <CardTitle className="text-lg truncate">{book.title}</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-lg truncate">{book.title}</CardTitle>
+                    {/* Indicateur de fichier pour livres numériques */}
+                    {(book.format === 'digital' || book.format === 'both') && (
+                      <div className={`w-3 h-3 rounded-full ${book.file_path ? 'bg-green-500' : 'bg-orange-400'}`} 
+                           title={book.file_path ? 'Fichier numérique disponible' : 'Fichier numérique manquant'} />
+                    )}
+                  </div>
                   <p className="text-sm text-gray-600 mt-1">
                     {book.authors?.join(', ') || 'Auteur inconnu'}
                   </p>
+                  {/* Status du fichier */}
+                  {(book.format === 'digital' || book.format === 'both') && (
+                    <p className={`text-xs mt-1 ${book.file_path ? 'text-green-600' : 'text-orange-600'}`}>
+                      {book.file_path ? '📄 Fichier disponible' : '⚠️ Fichier manquant'}
+                    </p>
+                  )}
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
