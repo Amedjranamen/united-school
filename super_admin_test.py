@@ -209,9 +209,8 @@ class SuperAdminTester:
             success, _ = self.run_test(
                 "Regular User Try Update School Status (Should Fail)",
                 "PUT",
-                f"schools/{school_id}/status",
-                403,
-                data="approved"
+                f"schools/{school_id}/status?status=approved",
+                403
             )
             
             # Restore super admin token
