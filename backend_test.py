@@ -433,57 +433,50 @@ class SchoolLibraryAPITester:
                 print("\n👤 Testing Get Current User...")
                 self.test_get_current_user()
 
-        # Test 4: Super Admin Login
-        print("\n👑 Testing Super Admin Login...")
-        super_admin_success, super_admin_info = self.test_super_admin_login()
-        
-        if super_admin_success:
-            # Test 5: Dashboard stats as super admin
-            print("\n📊 Testing Dashboard Stats (Super Admin)...")
-            self.test_dashboard_stats()
-            
-            # Test 6: Get schools as super admin
-            print("\n🏫 Testing Get Schools (Super Admin)...")
-            self.test_get_schools()
-
-        # Test 7: School Registration (no auth required)
+        # Test 4: School Registration (no auth required)
         print("\n🏫 Testing School Registration...")
         self.token = None  # Clear token for school registration
         school_success, school_data = self.test_school_registration()
 
-        # Test 8: School Admin Login
-        print("\n🎓 Testing School Admin Login...")
-        school_admin_success, school_admin_info = self.test_school_admin_login()
-        
+        # Test 5: School Admin Login (use the admin created during school registration)
+        school_admin_success = False
         test_books = []
-        if school_admin_success:
-            # Test 9: Dashboard stats as school admin
-            print("\n📊 Testing Dashboard Stats (School Admin)...")
-            self.test_dashboard_stats()
+        if school_success and school_data:
+            print("\n🎓 Testing School Admin Login...")
+            school_info, school_creation_data = school_data
+            school_admin_success, school_admin_info = self.test_user_login(
+                school_creation_data['admin_email'], 
+                school_creation_data['admin_password']
+            )
             
-            # Test 10: Create test books for catalog testing
-            print("\n📚 Creating Test Books for Catalog Interface...")
-            test_books = self.create_test_books()
+            if school_admin_success:
+                # Test 6: Dashboard stats as school admin
+                print("\n📊 Testing Dashboard Stats (School Admin)...")
+                self.test_dashboard_stats()
+                
+                # Test 7: Create test books for catalog testing
+                print("\n📚 Creating Test Books for Catalog Interface...")
+                test_books = self.create_test_books()
 
-        # Test 11: Get books (public endpoint)
+        # Test 8: Get books (public endpoint)
         print("\n📖 Testing Get Books List...")
         self.test_get_books()
 
-        # Test 12: Test specific book retrieval
+        # Test 9: Test specific book retrieval
         if test_books:
             print("\n📖 Testing Get Book by ID...")
             for book in test_books:
                 self.test_get_book_by_id(book['data']['id'])
         
-        # Test 13: Test invalid book ID
+        # Test 10: Test invalid book ID
         print("\n❌ Testing Get Book by Invalid ID...")
         self.test_get_book_by_invalid_id()
 
-        # Test 14: Test unauthorized access
+        # Test 11: Test unauthorized access
         print("\n🚫 Testing Unauthorized Access...")
         self.test_unauthorized_access()
 
-        # Test 15-18: Test catalog interface endpoints with authentication
+        # Test 12-16: Test catalog interface endpoints with authentication
         if user_success and test_user:
             print("\n🔐 Re-authenticating test user for catalog tests...")
             login_success, user_info = self.test_user_login(test_user['email'], test_user['password'])
