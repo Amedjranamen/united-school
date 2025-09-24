@@ -726,11 +726,11 @@ const ManageBooks = () => {
     if (!file) return;
     
     setUploadingFile(true);
-    const formData = new FormData();
-    formData.append('file', file);
+    const uploadFormData = new FormData();
+    uploadFormData.append('file', file);
 
     try {
-      await axios.post(`${API}/books/${bookId}/upload-file`, formData, {
+      await axios.post(`${API}/books/${bookId}/upload-file`, uploadFormData, {
         headers: { 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
@@ -1095,6 +1095,7 @@ const ManageBooks = () => {
       )}
     </div>
   );
+};
 
 // Dashboard component
 const Dashboard = () => {
