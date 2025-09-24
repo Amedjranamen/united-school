@@ -1314,6 +1314,571 @@ const Dashboard = () => {
   );
 };
 
+// Catalogue component
+const Catalogue = () => {
+  const { user, token } = useAuth();
+  const { toast } = useToast();
+  const [books, setBooks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterFormat, setFilterFormat] = useState('all');
+  const [filterCategory, setFilterCategory] = useState('all');
+  const [filterLanguage, setFilterLanguage] = useState('all');
+  const [sortBy, setSortBy] = useState('title');
+  const [viewMode, setViewMode] = useState('grid'); // grid or list
+  const [selectedBook, setSelectedBook] = useState(null);
+  const [showBookDialog, setShowBookDialog] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const booksPerPage = 12;
+
+  useEffect(() => {
+    fetchBooks();
+  }, [token]);
+
+  const fetchBooks = async () => {
+    try {
+      const response = await axios.get(`${API}/books`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setBooks(response.data);
+      
+      // Extract unique categories
+      const allCategories = new Set();
+      response.data.forEach(book => {
+        if (book.categories) {
+          book.categories.forEach(cat => allCategories.add(cat));
+        }
+      });
+      setCategories([...allCategories].sort());
+    } catch (error) {
+      console.error('Error fetching books:', error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de charger le catalogue"
+      });
+    }
+    setLoading(false);
+  };
+
+  const handleBookAction = async (book, action) => {
+    try {
+      if (action === 'borrow' && book.format === 'physical') {
+        // Reserve a physical copy
+        await axios.post(`${API}/loans/reserve`, {
+          book_id: book.id
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        toast({
+          title: "Réservation effectuée",
+          description: `Le livre "${book.title}" a été réservé avec succès`
+        });
+      } else if (action === 'download' && book.format === 'digital') {
+        // Generate download link for digital book
+        const response = await axios.post(`${API}/books/${book.id}/download`, {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        if (response.data.download_url) {
+          // Open download link
+          window.open(response.data.download_url, '_blank');
+          toast({
+            title: "Téléchargement initié",
+            description: `Le livre "${book.title}" sera téléchargé dans un moment`
+          });
+        }
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: error.response?.data?.detail || "Action impossible"
+      });
+    }
+  };
+
+  const filteredBooks = books.filter(book => {
+    const matchesSearch = book.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         book.authors?.some(author => author.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                         book.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesFormat = filterFormat === 'all' || book.format === filterFormat;
+    const matchesCategory = filterCategory === 'all' || book.categories?.includes(filterCategory);
+    const matchesLanguage = filterLanguage === 'all' || book.language === filterLanguage;
+    
+    return matchesSearch && matchesFormat && matchesCategory && matchesLanguage;
+  });
+
+  const sortedBooks = [...filteredBooks].sort((a, b) => {
+    switch (sortBy) {
+      case 'title':
+        return a.title.localeCompare(b.title);
+      case 'author':
+        return (a.authors?.[0] || '').localeCompare(b.authors?.[0] || '');
+      case 'newest':
+        return new Date(b.created_at) - new Date(a.created_at);
+      case 'oldest':
+        return new Date(a.created_at) - new Date(b.created_at);
+      default:
+        return 0;
+    }
+  });
+
+  // Pagination
+  const indexOfLastBook = currentPage * booksPerPage;
+  const indexOfFirstBook = indexOfLastBook - booksPerPage;
+  const currentBooks = sortedBooks.slice(indexOfFirstBook, indexOfLastBook);
+  const totalPages = Math.ceil(sortedBooks.length / booksPerPage);
+
+  const BookCard = ({ book }) => (
+    <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+      <div className="aspect-[3/4] bg-gradient-to-br from-emerald-50 to-orange-50 relative">
+        {book.cover_image ? (
+          <img 
+            src={book.cover_image} 
+            alt={book.title}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <BookOpen className="h-16 w-16 text-emerald-300" />
+          </div>
+        )}
+        <Badge className={`absolute top-2 right-2 ${book.format === 'digital' ? 'bg-blue-500' : 'bg-green-500'}`}>
+          {book.format === 'digital' ? 'Numérique' : 'Physique'}
+        </Badge>
+      </div>
+      <CardContent className="p-4">
+        <h3 className="font-semibold text-lg mb-2 line-clamp-2">{book.title}</h3>
+        {book.authors && book.authors.length > 0 && (
+          <p className="text-sm text-gray-600 mb-2">
+            par {book.authors.join(', ')}
+          </p>
+        )}
+        {book.categories && book.categories.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-3">
+            {book.categories.slice(0, 2).map((cat, idx) => (
+              <Badge key={idx} variant="outline" className="text-xs">
+                {cat}
+              </Badge>
+            ))}
+            {book.categories.length > 2 && (
+              <Badge variant="outline" className="text-xs">
+                +{book.categories.length - 2}
+              </Badge>
+            )}
+          </div>
+        )}
+        <div className="flex gap-2">
+          <Button 
+            size="sm" 
+            className="flex-1"
+            onClick={() => {
+              setSelectedBook(book);
+              setShowBookDialog(true);
+            }}
+          >
+            <Eye className="h-4 w-4 mr-1" />
+            Détails
+          </Button>
+          <Button 
+            size="sm" 
+            variant="outline"
+            onClick={() => handleBookAction(book, book.format === 'digital' ? 'download' : 'borrow')}
+          >
+            {book.format === 'digital' ? (
+              <>
+                <Download className="h-4 w-4 mr-1" />
+                Gratuit
+              </>
+            ) : (
+              <>
+                <Book className="h-4 w-4 mr-1" />
+                Emprunter
+              </>
+            )}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const BookListItem = ({ book }) => (
+    <Card className="mb-4">
+      <CardContent className="p-4">
+        <div className="flex gap-4">
+          <div className="w-20 h-28 bg-gradient-to-br from-emerald-50 to-orange-50 rounded flex items-center justify-center flex-shrink-0">
+            {book.cover_image ? (
+              <img 
+                src={book.cover_image} 
+                alt={book.title}
+                className="w-full h-full object-cover rounded"
+              />
+            ) : (
+              <BookOpen className="h-8 w-8 text-emerald-300" />
+            )}
+          </div>
+          <div className="flex-1">
+            <div className="flex justify-between items-start mb-2">
+              <h3 className="font-semibold text-lg">{book.title}</h3>
+              <Badge className={book.format === 'digital' ? 'bg-blue-500' : 'bg-green-500'}>
+                {book.format === 'digital' ? 'Numérique' : 'Physique'}
+              </Badge>
+            </div>
+            {book.authors && book.authors.length > 0 && (
+              <p className="text-sm text-gray-600 mb-2">
+                par {book.authors.join(', ')}
+              </p>
+            )}
+            <p className="text-sm text-gray-700 mb-3 line-clamp-2">
+              {book.description}
+            </p>
+            {book.categories && book.categories.length > 0 && (
+              <div className="flex flex-wrap gap-1 mb-3">
+                {book.categories.map((cat, idx) => (
+                  <Badge key={idx} variant="outline" className="text-xs">
+                    {cat}
+                  </Badge>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <Button 
+                size="sm"
+                onClick={() => {
+                  setSelectedBook(book);
+                  setShowBookDialog(true);
+                }}
+              >
+                <Eye className="h-4 w-4 mr-1" />
+                Détails
+              </Button>
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => handleBookAction(book, book.format === 'digital' ? 'download' : 'borrow')}
+              >
+                {book.format === 'digital' ? (
+                  <>
+                    <Download className="h-4 w-4 mr-1" />
+                    Télécharger
+                  </>
+                ) : (
+                  <>
+                    <Book className="h-4 w-4 mr-1" />
+                    Emprunter
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Catalogue de la Bibliothèque</h1>
+        <p className="text-gray-600">
+          Découvrez notre collection de {books.length} livres numériques et physiques
+        </p>
+      </div>
+
+      {/* Search and Filters */}
+      <Card className="mb-8">
+        <CardContent className="p-6">
+          {/* Search bar */}
+          <div className="flex gap-4 mb-6">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Rechercher par titre, auteur ou description..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant={viewMode === 'grid' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('grid')}
+              >
+                Grille
+              </Button>
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('list')}
+              >
+                Liste
+              </Button>
+            </div>
+          </div>
+
+          {/* Filters */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <Label className="text-sm font-medium mb-2 block">Format</Label>
+              <Select value={filterFormat} onValueChange={setFilterFormat}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les formats</SelectItem>
+                  <SelectItem value="physical">Physique</SelectItem>
+                  <SelectItem value="digital">Numérique</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium mb-2 block">Catégorie</Label>
+              <Select value={filterCategory} onValueChange={setFilterCategory}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Toutes les catégories</SelectItem>
+                  {categories.map(cat => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium mb-2 block">Langue</Label>
+              <Select value={filterLanguage} onValueChange={setFilterLanguage}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Toutes les langues</SelectItem>
+                  <SelectItem value="fr">Français</SelectItem>
+                  <SelectItem value="en">Anglais</SelectItem>
+                  <SelectItem value="es">Espagnol</SelectItem>
+                  <SelectItem value="de">Allemand</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium mb-2 block">Tri</Label>
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="title">Titre A-Z</SelectItem>
+                  <SelectItem value="author">Auteur A-Z</SelectItem>
+                  <SelectItem value="newest">Plus récent</SelectItem>
+                  <SelectItem value="oldest">Plus ancien</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Results summary */}
+      <div className="flex justify-between items-center mb-6">
+        <p className="text-gray-600">
+          {sortedBooks.length} livre{sortedBooks.length !== 1 ? 's' : ''} trouvé{sortedBooks.length !== 1 ? 's' : ''}
+        </p>
+      </div>
+
+      {/* Books Display */}
+      {currentBooks.length === 0 ? (
+        <div className="text-center py-12">
+          <BookOpen className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Aucun livre trouvé</h3>
+          <p className="text-gray-600">Essayez de modifier vos critères de recherche.</p>
+        </div>
+      ) : (
+        <>
+          {viewMode === 'grid' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
+              {currentBooks.map(book => (
+                <BookCard key={book.id} book={book} />
+              ))}
+            </div>
+          ) : (
+            <div className="mb-8">
+              {currentBooks.map(book => (
+                <BookListItem key={book.id} book={book} />
+              ))}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex justify-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+              >
+                Précédent
+              </Button>
+              
+              {[...Array(totalPages)].map((_, idx) => {
+                const pageNum = idx + 1;
+                if (
+                  pageNum === 1 || 
+                  pageNum === totalPages || 
+                  (pageNum >= currentPage - 2 && pageNum <= currentPage + 2)
+                ) {
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={currentPage === pageNum ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setCurrentPage(pageNum)}
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                } else if (pageNum === currentPage - 3 || pageNum === currentPage + 3) {
+                  return <span key={pageNum} className="px-2">...</span>;
+                }
+                return null;
+              })}
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Suivant
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Book Detail Dialog */}
+      <Dialog open={showBookDialog} onOpenChange={setShowBookDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          {selectedBook && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold">{selectedBook.title}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="aspect-[3/4] bg-gradient-to-br from-emerald-50 to-orange-50 rounded-lg flex items-center justify-center">
+                    {selectedBook.cover_image ? (
+                      <img 
+                        src={selectedBook.cover_image} 
+                        alt={selectedBook.title}
+                        className="w-full h-full object-cover rounded-lg"
+                      />
+                    ) : (
+                      <BookOpen className="h-20 w-20 text-emerald-300" />
+                    )}
+                  </div>
+                  
+                  <div className="md:col-span-2 space-y-4">
+                    {selectedBook.authors && selectedBook.authors.length > 0 && (
+                      <div>
+                        <h4 className="font-semibold text-gray-900">Auteur(s)</h4>
+                        <p className="text-gray-600">{selectedBook.authors.join(', ')}</p>
+                      </div>
+                    )}
+                    
+                    {selectedBook.isbn && (
+                      <div>
+                        <h4 className="font-semibold text-gray-900">ISBN</h4>
+                        <p className="text-gray-600">{selectedBook.isbn}</p>
+                      </div>
+                    )}
+                    
+                    <div>
+                      <h4 className="font-semibold text-gray-900">Format</h4>
+                      <Badge className={selectedBook.format === 'digital' ? 'bg-blue-500' : 'bg-green-500'}>
+                        {selectedBook.format === 'digital' ? 'Numérique' : 'Physique'}
+                      </Badge>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold text-gray-900">Langue</h4>
+                      <p className="text-gray-600">
+                        {selectedBook.language === 'fr' ? 'Français' : 
+                         selectedBook.language === 'en' ? 'Anglais' : 
+                         selectedBook.language === 'es' ? 'Espagnol' : 
+                         selectedBook.language === 'de' ? 'Allemand' : selectedBook.language}
+                      </p>
+                    </div>
+
+                    {selectedBook.categories && selectedBook.categories.length > 0 && (
+                      <div>
+                        <h4 className="font-semibold text-gray-900">Catégories</h4>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {selectedBook.categories.map((cat, idx) => (
+                            <Badge key={idx} variant="outline">{cat}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {selectedBook.description && (
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-2">Description</h4>
+                    <p className="text-gray-600 leading-relaxed">{selectedBook.description}</p>
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-4">
+                  <Button 
+                    className="flex-1"
+                    onClick={() => {
+                      handleBookAction(selectedBook, selectedBook.format === 'digital' ? 'download' : 'borrow');
+                      setShowBookDialog(false);
+                    }}
+                  >
+                    {selectedBook.format === 'digital' ? (
+                      <>
+                        <Download className="h-4 w-4 mr-2" />
+                        Télécharger gratuitement
+                      </>
+                    ) : (
+                      <>
+                        <Book className="h-4 w-4 mr-2" />
+                        Emprunter ce livre
+                      </>
+                    )}
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowBookDialog(false)}>
+                    Fermer
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
 function App() {
   return (
     <AuthProvider>
