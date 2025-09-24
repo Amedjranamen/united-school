@@ -202,6 +202,218 @@ class SchoolLibraryAPITester:
         )
         return success, response if success else None
 
+    def test_get_book_by_id(self, book_id):
+        """Test getting a specific book by ID"""
+        success, response = self.run_test(
+            f"Get Book by ID ({book_id})",
+            "GET",
+            f"books/{book_id}",
+            200
+        )
+        return success, response if success else None
+
+    def test_get_book_by_invalid_id(self):
+        """Test getting a book with invalid ID (should return 404)"""
+        success, response = self.run_test(
+            "Get Book by Invalid ID",
+            "GET",
+            "books/invalid-book-id-123",
+            404
+        )
+        return success, response if success else None
+
+    def test_reserve_physical_book(self, book_id):
+        """Test reserving a physical book"""
+        success, response = self.run_test(
+            f"Reserve Physical Book ({book_id})",
+            "POST",
+            "loans/reserve",
+            200,
+            data={"book_id": book_id}
+        )
+        return success, response if success else None
+
+    def test_reserve_nonexistent_book(self):
+        """Test reserving a non-existent book (should return 404)"""
+        success, response = self.run_test(
+            "Reserve Non-existent Book",
+            "POST",
+            "loans/reserve",
+            404,
+            data={"book_id": "nonexistent-book-id"}
+        )
+        return success, response if success else None
+
+    def test_reserve_without_book_id(self):
+        """Test reservation without book_id (should return 400)"""
+        success, response = self.run_test(
+            "Reserve Without Book ID",
+            "POST",
+            "loans/reserve",
+            400,
+            data={}
+        )
+        return success, response if success else None
+
+    def test_download_digital_book(self, book_id):
+        """Test downloading a digital book"""
+        success, response = self.run_test(
+            f"Download Digital Book ({book_id})",
+            "POST",
+            f"books/{book_id}/download",
+            200
+        )
+        return success, response if success else None
+
+    def test_download_nonexistent_book(self):
+        """Test downloading a non-existent book (should return 404)"""
+        success, response = self.run_test(
+            "Download Non-existent Book",
+            "POST",
+            "books/nonexistent-book-id/download",
+            404
+        )
+        return success, response if success else None
+
+    def test_serve_book_file(self, book_id):
+        """Test serving book file"""
+        success, response = self.run_test(
+            f"Serve Book File ({book_id})",
+            "GET",
+            f"books/{book_id}/file",
+            200
+        )
+        return success, response if success else None
+
+    def test_serve_nonexistent_book_file(self):
+        """Test serving file for non-existent book (should return 404)"""
+        success, response = self.run_test(
+            "Serve Non-existent Book File",
+            "GET",
+            "books/nonexistent-book-id/file",
+            404
+        )
+        return success, response if success else None
+
+    def test_unauthorized_access(self):
+        """Test accessing protected endpoints without authentication"""
+        # Save current token
+        saved_token = self.token
+        self.token = None
+        
+        # Test protected endpoints
+        success1, _ = self.run_test(
+            "Unauthorized Access to /auth/me",
+            "GET",
+            "auth/me",
+            401
+        )
+        
+        success2, _ = self.run_test(
+            "Unauthorized Access to Reserve Book",
+            "POST",
+            "loans/reserve",
+            401,
+            data={"book_id": "test-book-id"}
+        )
+        
+        success3, _ = self.run_test(
+            "Unauthorized Access to Download Book",
+            "POST",
+            "books/test-book-id/download",
+            401
+        )
+        
+        success4, _ = self.run_test(
+            "Unauthorized Access to Serve Book File",
+            "GET",
+            "books/test-book-id/file",
+            401
+        )
+        
+        # Restore token
+        self.token = saved_token
+        
+        return success1 and success2 and success3 and success4
+
+    def create_test_books(self):
+        """Create test books for testing catalog endpoints"""
+        books_created = []
+        
+        # Create a physical book
+        physical_book_data = {
+            "title": "Livre Physique Test",
+            "authors": ["Auteur Physique"],
+            "isbn": "978-2-111111-11-1",
+            "description": "Un livre physique pour tester les réservations",
+            "categories": ["Fiction", "Test"],
+            "language": "fr",
+            "format": "physical",
+            "price": 12.50,
+            "physical_copies": 2
+        }
+        
+        success, response = self.run_test(
+            "Create Physical Test Book",
+            "POST",
+            "books",
+            200,
+            data=physical_book_data
+        )
+        
+        if success and response:
+            books_created.append({"type": "physical", "data": response})
+        
+        # Create a digital book
+        digital_book_data = {
+            "title": "Livre Numérique Test",
+            "authors": ["Auteur Numérique"],
+            "isbn": "978-2-222222-22-2",
+            "description": "Un livre numérique pour tester les téléchargements",
+            "categories": ["Science", "Test"],
+            "language": "fr",
+            "format": "digital",
+            "price": 0.0,
+            "physical_copies": 0
+        }
+        
+        success, response = self.run_test(
+            "Create Digital Test Book",
+            "POST",
+            "books",
+            200,
+            data=digital_book_data
+        )
+        
+        if success and response:
+            books_created.append({"type": "digital", "data": response})
+        
+        # Create a book with both formats
+        both_book_data = {
+            "title": "Livre Mixte Test",
+            "authors": ["Auteur Mixte"],
+            "isbn": "978-2-333333-33-3",
+            "description": "Un livre disponible en physique et numérique",
+            "categories": ["Histoire", "Test"],
+            "language": "fr",
+            "format": "both",
+            "price": 8.99,
+            "physical_copies": 1
+        }
+        
+        success, response = self.run_test(
+            "Create Mixed Format Test Book",
+            "POST",
+            "books",
+            200,
+            data=both_book_data
+        )
+        
+        if success and response:
+            books_created.append({"type": "both", "data": response})
+        
+        return books_created
+
     def run_all_tests(self):
         """Run all API tests"""
         print("🚀 Starting School Library API Tests")
