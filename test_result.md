@@ -268,8 +268,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Interface gestion des livres"
-    - "Interface administration"
+    - "API gestion livres et exemplaires"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
