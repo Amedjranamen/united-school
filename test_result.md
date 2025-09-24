@@ -275,6 +275,8 @@ metadata:
 test_plan:
   current_focus:
     - "API gestion livres et exemplaires"
+    - "Interface catalogue complet" 
+    - "Interface gestion des livres"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
