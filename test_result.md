@@ -216,8 +216,8 @@ frontend:
           comment: "Dashboard avec statistiques selon rôle utilisateur"
 
   - task: "Interface catalogue complet"
-    implemented: false
-    working: "NA"
+    implemented: true
+    working: true
     file: "/app/frontend/src/App.js"
     stuck_count: 0
     priority: "high"
@@ -229,6 +229,9 @@ frontend:
         - working: "NA"
           agent: "main"
           comment: "Début implémentation interface catalogue avec recherche, filtres, téléchargement gratuit"
+        - working: true
+          agent: "main"
+          comment: "Interface catalogue COMPLÈTE et fonctionnelle - recherche avancée, filtres multiples, pagination, vue grille/liste, modal détails, téléchargement gratuit, emprunt physique"
 
   - task: "Interface gestion des livres"
     implemented: true
