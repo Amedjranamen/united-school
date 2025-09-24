@@ -375,6 +375,49 @@ async def get_book(book_id: str):
     
     return Book(**parse_from_mongo(book))
 
+@api_router.put("/books/{book_id}", response_model=Book)
+async def update_book(book_id: str, book_data: BookCreate, current_user: User = Depends(get_current_user)):
+    # Check if book exists
+    book = await db.books.find_one({"id": book_id})
+    if not book:
+        raise HTTPException(status_code=404, detail="Livre introuvable")
+    
+    # Check permissions
+    if book["published_by_user"] != current_user.id and current_user.role not in [UserRole.SCHOOL_ADMIN, UserRole.LIBRARIAN]:
+        raise HTTPException(status_code=403, detail="Vous n'êtes pas autorisé à modifier ce livre")
+    
+    # Update book data
+    update_data = book_data.dict(exclude={"physical_copies"})
+    update_data = prepare_for_mongo(update_data)
+    
+    await db.books.update_one({"id": book_id}, {"$set": update_data})
+    
+    # Get updated book
+    updated_book = await db.books.find_one({"id": book_id})
+    return Book(**parse_from_mongo(updated_book))
+
+@api_router.delete("/books/{book_id}")
+async def delete_book(book_id: str, current_user: User = Depends(get_current_user)):
+    # Check if book exists
+    book = await db.books.find_one({"id": book_id})
+    if not book:
+        raise HTTPException(status_code=404, detail="Livre introuvable")
+    
+    # Check permissions
+    if book["published_by_user"] != current_user.id and current_user.role not in [UserRole.SCHOOL_ADMIN, UserRole.LIBRARIAN]:
+        raise HTTPException(status_code=403, detail="Vous n'êtes pas autorisé à supprimer ce livre")
+    
+    # Delete associated copies
+    await db.book_copies.delete_many({"book_id": book_id})
+    
+    # Delete loans associated with this book
+    await db.loans.delete_many({"book_id": book_id})
+    
+    # Delete the book
+    await db.books.delete_one({"id": book_id})
+    
+    return {"message": "Livre supprimé avec succès"}
+
 # Loan endpoints
 @api_router.post("/loans", response_model=Loan)
 async def create_loan(loan_data: LoanCreate, current_user: User = Depends(get_current_user)):
