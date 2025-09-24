@@ -1919,12 +1919,7 @@ function App() {
                 path="/admin" 
                 element={
                   <ProtectedRoute roles={['super_admin']}>
-                    <div className="max-w-7xl mx-auto px-4 py-8">
-                      <h1 className="text-3xl font-bold mb-8 text-center">Administration (À venir)</h1>
-                      <p className="text-center text-gray-600">
-                        Le panneau d'administration sera disponible dans la prochaine version.
-                      </p>
-                    </div>
+                    <Administration />
                   </ProtectedRoute>
                 } 
               />
