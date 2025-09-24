@@ -221,10 +221,11 @@ async def register_user(user_data: UserCreate):
     
     # Create user
     user_dict = user_data.dict(exclude={"password"})
-    user_dict["password_hash"] = hashed_password
     user = User(**user_dict)
     
+    # Prepare for MongoDB with password hash
     user_mongo = prepare_for_mongo(user.dict())
+    user_mongo["password_hash"] = hashed_password
     await db.users.insert_one(user_mongo)
     
     return user
