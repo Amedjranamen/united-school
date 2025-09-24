@@ -528,9 +528,13 @@ async def upload_book_file(
 # Book reservation endpoint (for physical books)
 @api_router.post("/loans/reserve")
 async def reserve_book(
-    book_id: str = Form(...),
+    request_data: dict,
     current_user: User = Depends(get_current_user)
 ):
+    book_id = request_data.get("book_id")
+    if not book_id:
+        raise HTTPException(status_code=400, detail="book_id requis")
+    
     # Check if book exists
     book = await db.books.find_one({"id": book_id})
     if not book:
