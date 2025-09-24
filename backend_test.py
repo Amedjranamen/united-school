@@ -691,7 +691,12 @@ class SchoolLibraryAPITester:
         print("\n🚫 Testing Unauthorized Access...")
         self.test_unauthorized_access()
 
-        # Test 12-16: Test catalog interface endpoints with authentication
+        # Test 12: Test file upload functionality (CRITICAL PRIORITY)
+        if school_admin_success and school_admin_info:
+            print("\n🎯 PRIORITY TEST: File Upload Functionality...")
+            self.test_complete_digital_book_flow()
+
+        # Test 13-17: Test catalog interface endpoints with authentication
         if user_success and test_user:
             print("\n🔐 Re-authenticating test user for catalog tests...")
             login_success, user_info = self.test_user_login(test_user['email'], test_user['password'])
