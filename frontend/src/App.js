@@ -1441,8 +1441,18 @@ const Catalogue = () => {
         });
         
         if (response.data.download_url) {
-          // Open download link
-          window.open(response.data.download_url, '_blank');
+          // Create proper download URL
+          const downloadUrl = `${API}${response.data.download_url.replace('/api', '')}`;
+          
+          // Create a temporary link and trigger download
+          const link = document.createElement('a');
+          link.href = downloadUrl;
+          link.download = `${book.title}.${response.data.download_url.endsWith('.pdf') ? 'pdf' : 'epub'}`;
+          link.target = '_blank';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
           toast({
             title: "Téléchargement initié",
             description: `Le livre "${book.title}" sera téléchargé dans un moment`
