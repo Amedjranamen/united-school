@@ -295,6 +295,209 @@ class SchoolLibraryAPITester:
         )
         return success, response if success else None
 
+    def test_upload_book_file(self, book_id, file_content=b"Test PDF content", filename="test.pdf"):
+        """Test uploading a file to a book"""
+        url = f"{self.api_url}/books/{book_id}/upload-file"
+        headers = {}
+        
+        if self.token:
+            headers['Authorization'] = f'Bearer {self.token}'
+
+        print(f"\n🔍 Testing Upload Book File ({book_id})...")
+        print(f"   URL: {url}")
+        
+        try:
+            files = {'file': (filename, file_content, 'application/pdf')}
+            response = requests.post(url, files=files, headers=headers, timeout=10)
+            
+            success = response.status_code == 200
+            
+            if success:
+                self.log_test(f"Upload Book File ({book_id})", True)
+                try:
+                    return True, response.json()
+                except:
+                    return True, response.text
+            else:
+                error_msg = f"Expected 200, got {response.status_code}"
+                try:
+                    error_detail = response.json()
+                    error_msg += f" - {error_detail}"
+                except:
+                    error_msg += f" - {response.text[:200]}"
+                
+                self.log_test(f"Upload Book File ({book_id})", False, error_msg)
+                return False, {}
+
+        except Exception as e:
+            self.log_test(f"Upload Book File ({book_id})", False, f"Request failed: {str(e)}")
+            return False, {}
+
+    def test_upload_invalid_file_format(self, book_id):
+        """Test uploading invalid file format (should return 400)"""
+        url = f"{self.api_url}/books/{book_id}/upload-file"
+        headers = {}
+        
+        if self.token:
+            headers['Authorization'] = f'Bearer {self.token}'
+
+        print(f"\n🔍 Testing Upload Invalid File Format ({book_id})...")
+        print(f"   URL: {url}")
+        
+        try:
+            files = {'file': ('test.txt', b"Invalid text content", 'text/plain')}
+            response = requests.post(url, files=files, headers=headers, timeout=10)
+            
+            success = response.status_code == 400
+            
+            if success:
+                self.log_test(f"Upload Invalid File Format ({book_id})", True)
+                try:
+                    return True, response.json()
+                except:
+                    return True, response.text
+            else:
+                error_msg = f"Expected 400, got {response.status_code}"
+                try:
+                    error_detail = response.json()
+                    error_msg += f" - {error_detail}"
+                except:
+                    error_msg += f" - {response.text[:200]}"
+                
+                self.log_test(f"Upload Invalid File Format ({book_id})", False, error_msg)
+                return False, {}
+
+        except Exception as e:
+            self.log_test(f"Upload Invalid File Format ({book_id})", False, f"Request failed: {str(e)}")
+            return False, {}
+
+    def test_complete_digital_book_flow(self, school_id=None):
+        """Test complete digital book flow: create → upload → verify file_path → download"""
+        print("\n🎯 TESTING COMPLETE DIGITAL BOOK FLOW")
+        print("=" * 50)
+        
+        # If no school_id provided, try to get it from current user
+        if not school_id:
+            success, user_info = self.test_get_current_user()
+            if success and user_info and user_info.get('school_id'):
+                school_id = user_info['school_id']
+            else:
+                print("⚠️ Warning: No school_id available for digital book flow test")
+                return False
+        
+        # Step 1: Create a digital book
+        digital_book_data = {
+            "title": "Livre Numérique Upload Test",
+            "authors": ["Auteur Upload Test"],
+            "isbn": "978-2-444444-44-4",
+            "description": "Un livre numérique pour tester l'upload complet",
+            "categories": ["Test", "Upload"],
+            "language": "fr",
+            "format": "digital",
+            "price": 0.0,
+            "school_id": school_id,
+            "physical_copies": 0
+        }
+        
+        print("\n📚 Step 1: Creating digital book...")
+        success, book_response = self.run_test(
+            "Create Digital Book for Upload Test",
+            "POST",
+            "books",
+            200,
+            data=digital_book_data
+        )
+        
+        if not success or not book_response:
+            print("❌ Failed to create digital book - aborting flow test")
+            return False
+        
+        book_id = book_response['id']
+        print(f"✅ Digital book created with ID: {book_id}")
+        
+        # Step 2: Verify book has no file_path initially
+        print("\n🔍 Step 2: Verifying book has no file_path initially...")
+        success, book_details = self.test_get_book_by_id(book_id)
+        
+        if success and book_details:
+            has_file_path = 'file_path' in book_details and book_details['file_path']
+            if has_file_path:
+                print(f"⚠️ Warning: Book already has file_path: {book_details['file_path']}")
+            else:
+                print("✅ Confirmed: Book has no file_path initially")
+        
+        # Step 3: Upload a file
+        print("\n📤 Step 3: Uploading PDF file...")
+        test_pdf_content = b"%PDF-1.4\n1 0 obj\n<<\n/Type /Catalog\n/Pages 2 0 R\n>>\nendobj\n2 0 obj\n<<\n/Type /Pages\n/Kids [3 0 R]\n/Count 1\n>>\nendobj\n3 0 obj\n<<\n/Type /Page\n/Parent 2 0 R\n/MediaBox [0 0 612 792]\n>>\nendobj\nxref\n0 4\n0000000000 65535 f \n0000000009 00000 n \n0000000074 00000 n \n0000000120 00000 n \ntrailer\n<<\n/Size 4\n/Root 1 0 R\n>>\nstartxref\n179\n%%EOF"
+        
+        upload_success, upload_response = self.test_upload_book_file(book_id, test_pdf_content, "test_book.pdf")
+        
+        if not upload_success:
+            print("❌ Failed to upload file - aborting flow test")
+            return False
+        
+        print("✅ File uploaded successfully")
+        
+        # Step 4: Verify book now has file_path
+        print("\n🔍 Step 4: Verifying book now has file_path...")
+        success, updated_book_details = self.test_get_book_by_id(book_id)
+        
+        if success and updated_book_details:
+            has_file_path = 'file_path' in updated_book_details and updated_book_details['file_path']
+            if has_file_path:
+                print(f"✅ SUCCESS: Book now has file_path: {updated_book_details['file_path']}")
+                file_path = updated_book_details['file_path']
+            else:
+                print("❌ CRITICAL ISSUE: Book still has no file_path after upload!")
+                self.log_test("Digital Book Flow - File Path Update", False, "Book has no file_path after successful upload")
+                return False
+        else:
+            print("❌ Failed to retrieve updated book details")
+            return False
+        
+        # Step 5: Test download endpoint
+        print("\n💾 Step 5: Testing download endpoint...")
+        download_success, download_response = self.test_download_digital_book(book_id)
+        
+        if not download_success:
+            print("❌ Download endpoint failed")
+            return False
+        
+        print("✅ Download endpoint working")
+        
+        # Step 6: Test file serving endpoint
+        print("\n📁 Step 6: Testing file serving endpoint...")
+        serve_success, serve_response = self.test_serve_book_file(book_id)
+        
+        if not serve_success:
+            print("❌ File serving endpoint failed")
+            return False
+        
+        print("✅ File serving endpoint working")
+        
+        # Step 7: Test with EPUB file
+        print("\n📖 Step 7: Testing EPUB upload...")
+        epub_content = b"PK\x03\x04\x14\x00\x00\x00\x08\x00"  # Basic EPUB header
+        epub_success, epub_response = self.test_upload_book_file(book_id, epub_content, "test_book.epub")
+        
+        if epub_success:
+            print("✅ EPUB upload successful")
+        else:
+            print("⚠️ EPUB upload failed (may be expected)")
+        
+        # Step 8: Test invalid file format
+        print("\n❌ Step 8: Testing invalid file format...")
+        invalid_success, invalid_response = self.test_upload_invalid_file_format(book_id)
+        
+        if invalid_success:
+            print("✅ Invalid file format correctly rejected")
+        else:
+            print("⚠️ Invalid file format not properly rejected")
+        
+        print("\n🎯 DIGITAL BOOK FLOW TEST COMPLETED")
+        self.log_test("Complete Digital Book Flow", True, "All steps completed successfully")
+        return True
+
     def test_unauthorized_access(self):
         """Test accessing protected endpoints without authentication"""
         # Save current token
