@@ -722,6 +722,30 @@ const ManageBooks = () => {
     }
   };
 
+  const handleDownload = async (bookId) => {
+    try {
+      const response = await axios.post(`${API}/books/${bookId}/download`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      // Ouvrir l'URL de téléchargement dans un nouvel onglet
+      const downloadUrl = `${API}${response.data.download_url.replace('/api', '')}`;
+      window.open(downloadUrl, '_blank');
+      
+      toast({
+        title: "Téléchargement initié",
+        description: `Téléchargement de "${response.data.book_title}" en cours`
+      });
+    } catch (error) {
+      console.error('Download error:', error);
+      toast({
+        variant: "destructive",
+        title: "Erreur de téléchargement",
+        description: error.response?.data?.detail || "Impossible de télécharger le fichier"
+      });
+    }
+  };
+
   const handleFileUpload = async (bookId, file) => {
     if (!file) return;
     
