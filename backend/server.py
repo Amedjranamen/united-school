@@ -524,6 +524,137 @@ async def upload_book_file(
     
     return {"message": "Fichier uploadé avec succès", "file_path": str(file_path)}
 
+# Book reservation endpoint (for physical books)
+@api_router.post("/loans/reserve")
+async def reserve_book(
+    book_id: str = Form(...),
+    current_user: User = Depends(get_current_user)
+):
+    # Check if book exists
+    book = await db.books.find_one({"id": book_id})
+    if not book:
+        raise HTTPException(status_code=404, detail="Livre introuvable")
+    
+    # Only for physical books
+    if book["format"] not in [BookFormat.PHYSICAL, BookFormat.BOTH]:
+        raise HTTPException(status_code=400, detail="Ce livre n'est pas disponible en format physique")
+    
+    # Check if user already has a reservation for this book
+    existing_loan = await db.loans.find_one({
+        "book_id": book_id,
+        "user_id": current_user.id,
+        "status": {"$in": [LoanStatus.RESERVED, LoanStatus.BORROWED]}
+    })
+    if existing_loan:
+        raise HTTPException(status_code=400, detail="Vous avez déjà une réservation ou un emprunt actif pour ce livre")
+    
+    # Find available copy
+    available_copy = await db.book_copies.find_one({
+        "book_id": book_id,
+        "status": "available"
+    })
+    if not available_copy:
+        raise HTTPException(status_code=400, detail="Aucun exemplaire disponible pour ce livre")
+    
+    # Create loan with reserved status
+    due_date = datetime.now(timezone.utc) + timedelta(days=14)  # 14 days loan period
+    loan = Loan(
+        book_id=book_id,
+        copy_id=available_copy["id"],
+        user_id=current_user.id,
+        due_date=due_date,
+        status=LoanStatus.RESERVED
+    )
+    
+    # Reserve the copy
+    await db.book_copies.update_one(
+        {"id": available_copy["id"]},
+        {"$set": {"status": "reserved"}}
+    )
+    
+    # Insert loan
+    loan_mongo = prepare_for_mongo(loan.dict())
+    await db.loans.insert_one(loan_mongo)
+    
+    return {
+        "message": "Livre réservé avec succès",
+        "loan_id": loan.id,
+        "due_date": due_date.isoformat(),
+        "book_title": book["title"]
+    }
+
+# Book download endpoint (for digital books)
+@api_router.post("/books/{book_id}/download")
+async def download_book(book_id: str, current_user: User = Depends(get_current_user)):
+    # Check if book exists
+    book = await db.books.find_one({"id": book_id})
+    if not book:
+        raise HTTPException(status_code=404, detail="Livre introuvable")
+    
+    # Only for digital books
+    if book["format"] not in [BookFormat.DIGITAL, BookFormat.BOTH]:
+        raise HTTPException(status_code=400, detail="Ce livre n'est pas disponible en format numérique")
+    
+    # Check if book has a file
+    if not book.get("file_path"):
+        raise HTTPException(status_code=404, detail="Fichier non disponible pour ce livre")
+    
+    # Check if file exists
+    file_path = Path(book["file_path"])
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Fichier non trouvé sur le serveur")
+    
+    # Since books are free, we'll create a download record for tracking
+    download_record = {
+        "id": str(uuid.uuid4()),
+        "book_id": book_id,
+        "user_id": current_user.id,
+        "downloaded_at": datetime.now(timezone.utc).isoformat(),
+        "book_title": book["title"]
+    }
+    
+    # Insert download record (optional, for analytics)
+    try:
+        await db.downloads.insert_one(download_record)
+    except Exception:
+        pass  # Don't fail download if logging fails
+    
+    # For now, return the file path (in production, you'd use signed URLs)
+    return {
+        "message": "Livre prêt pour téléchargement",
+        "download_url": f"/api/books/{book_id}/file",
+        "book_title": book["title"],
+        "file_size": file_path.stat().st_size if file_path.exists() else 0
+    }
+
+# Serve book files
+@api_router.get("/books/{book_id}/file")
+async def serve_book_file(book_id: str, current_user: User = Depends(get_current_user)):
+    from fastapi.responses import FileResponse
+    
+    # Check if book exists
+    book = await db.books.find_one({"id": book_id})
+    if not book:
+        raise HTTPException(status_code=404, detail="Livre introuvable")
+    
+    # Check if book has a file
+    if not book.get("file_path"):
+        raise HTTPException(status_code=404, detail="Fichier non disponible")
+    
+    file_path = Path(book["file_path"])
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Fichier non trouvé")
+    
+    # Determine the media type
+    media_type = "application/pdf" if file_path.suffix.lower() == ".pdf" else "application/epub+zip"
+    
+    return FileResponse(
+        path=str(file_path),
+        media_type=media_type,
+        filename=f"{book['title']}.{file_path.suffix.lower().lstrip('.')}",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{book['title']}.{file_path.suffix.lower().lstrip('.')}"}
+    )
+
 # Dashboard endpoints
 @api_router.get("/dashboard/stats")
 async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
