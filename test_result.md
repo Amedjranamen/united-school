@@ -247,6 +247,9 @@ frontend:
         - working: true
           agent: "main"
           comment: "Interface complète implémentée - CRUD livres, upload fichiers, recherche/filtres, gestion par rôle"
+        - working: true
+          agent: "main"
+          comment: "UX améliorée - indicateurs visuels fichiers, feedback upload détaillé, boutons téléchargement, gestion d'erreurs robuste"
 
   - task: "Interface administration"
     implemented: true
