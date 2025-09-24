@@ -728,9 +728,16 @@ const ManageBooks = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      // Ouvrir l'URL de téléchargement dans un nouvel onglet
+      // Create proper download URL and trigger download
       const downloadUrl = `${API}${response.data.download_url.replace('/api', '')}`;
-      window.open(downloadUrl, '_blank');
+      
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = response.data.book_title || 'livre';
+      link.target = '_blank';  
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
       
       toast({
         title: "Téléchargement initié",
