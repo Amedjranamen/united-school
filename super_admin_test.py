@@ -121,9 +121,8 @@ class SuperAdminTester:
         success, response = self.run_test(
             f"Update School Status to {status}",
             "PUT",
-            f"schools/{school_id}/status",
-            200,
-            data=status  # Send status as string directly
+            f"schools/{school_id}/status?status={status}",
+            200
         )
         return success, response if success else None
 
