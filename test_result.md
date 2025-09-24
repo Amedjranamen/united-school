@@ -255,3 +255,5 @@ test_plan:
 agent_communication:
     - agent: "main"
       message: "Application basique fonctionnelle avec authentification et backend complet. Fonctionnalités principales à implémenter: catalogue, gestion livres, administration."
+    - agent: "main"
+      message: "Début implémentation interface catalogue complet - priorité 1. Backend API fonctionnel, il faut finaliser l'interface frontend."
