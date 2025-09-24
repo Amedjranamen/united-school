@@ -18,7 +18,7 @@ import { useToast } from './hooks/use-toast';
 import { Toaster } from './components/ui/toaster';
 
 // Icons
-import { Search, Book, Users, Plus, Upload, Eye, Download, User, School, FileText, Calendar, CheckCircle, XCircle } from 'lucide-react';
+import { Search, Book, Users, Plus, Upload, Eye, Download, User, School, FileText, Calendar, CheckCircle, XCircle, Edit, Trash2, BookOpen, Filter, MoreHorizontal } from 'lucide-react';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
