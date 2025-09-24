@@ -111,6 +111,7 @@ class BookBase(BaseModel):
     format: BookFormat = BookFormat.PHYSICAL
     price: Optional[float] = 0.0
     cover_image: Optional[str] = None
+    file_path: Optional[str] = None
 
 class BookCreate(BookBase):
     school_id: str
