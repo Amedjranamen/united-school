@@ -455,18 +455,63 @@ class SchoolLibraryAPITester:
         print("\n🎓 Testing School Admin Login...")
         school_admin_success, school_admin_info = self.test_school_admin_login()
         
+        test_books = []
         if school_admin_success:
             # Test 9: Dashboard stats as school admin
             print("\n📊 Testing Dashboard Stats (School Admin)...")
             self.test_dashboard_stats()
             
-            # Test 10: Book creation as school admin
-            print("\n📚 Testing Book Creation (School Admin)...")
-            self.test_book_creation()
+            # Test 10: Create test books for catalog testing
+            print("\n📚 Creating Test Books for Catalog Interface...")
+            test_books = self.create_test_books()
 
         # Test 11: Get books (public endpoint)
         print("\n📖 Testing Get Books List...")
         self.test_get_books()
+
+        # Test 12: Test specific book retrieval
+        if test_books:
+            print("\n📖 Testing Get Book by ID...")
+            for book in test_books:
+                self.test_get_book_by_id(book['data']['id'])
+        
+        # Test 13: Test invalid book ID
+        print("\n❌ Testing Get Book by Invalid ID...")
+        self.test_get_book_by_invalid_id()
+
+        # Test 14: Test unauthorized access
+        print("\n🚫 Testing Unauthorized Access...")
+        self.test_unauthorized_access()
+
+        # Test 15-18: Test catalog interface endpoints with authentication
+        if user_success and test_user:
+            print("\n🔐 Re-authenticating test user for catalog tests...")
+            login_success, user_info = self.test_user_login(test_user['email'], test_user['password'])
+            
+            if login_success and test_books:
+                print("\n📚 Testing Catalog Interface Endpoints...")
+                
+                # Test book reservation (physical books)
+                physical_books = [book for book in test_books if book['type'] in ['physical', 'both']]
+                if physical_books:
+                    print("\n📋 Testing Book Reservation...")
+                    self.test_reserve_physical_book(physical_books[0]['data']['id'])
+                
+                # Test digital book download
+                digital_books = [book for book in test_books if book['type'] in ['digital', 'both']]
+                if digital_books:
+                    print("\n💾 Testing Digital Book Download...")
+                    self.test_download_digital_book(digital_books[0]['data']['id'])
+                    
+                    print("\n📁 Testing Book File Serving...")
+                    self.test_serve_book_file(digital_books[0]['data']['id'])
+                
+                # Test error cases
+                print("\n❌ Testing Error Cases...")
+                self.test_reserve_nonexistent_book()
+                self.test_reserve_without_book_id()
+                self.test_download_nonexistent_book()
+                self.test_serve_nonexistent_book_file()
 
         # Print final results
         print("\n" + "=" * 50)
