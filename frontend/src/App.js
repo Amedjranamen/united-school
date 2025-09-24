@@ -1350,12 +1350,7 @@ function App() {
                 path="/manage-books" 
                 element={
                   <ProtectedRoute roles={['school_admin', 'librarian', 'teacher']}>
-                    <div className="max-w-7xl mx-auto px-4 py-8">
-                      <h1 className="text-3xl font-bold mb-8 text-center">Gestion des livres (À venir)</h1>
-                      <p className="text-center text-gray-600">
-                        La gestion des livres sera disponible dans la prochaine version.
-                      </p>
-                    </div>
+                    <ManageBooks />
                   </ProtectedRoute>
                 } 
               />
