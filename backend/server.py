@@ -635,8 +635,6 @@ async def download_book(book_id: str, current_user: User = Depends(get_current_u
 # Serve book files
 @api_router.get("/books/{book_id}/file")
 async def serve_book_file(book_id: str, current_user: User = Depends(get_current_user)):
-    from fastapi.responses import FileResponse
-    
     # Check if book exists
     book = await db.books.find_one({"id": book_id})
     if not book:
