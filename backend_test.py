@@ -336,9 +336,18 @@ class SchoolLibraryAPITester:
         
         return success1 and success2 and success3 and success4
 
-    def create_test_books(self):
+    def create_test_books(self, school_id=None):
         """Create test books for testing catalog endpoints"""
         books_created = []
+        
+        # If no school_id provided, try to get it from current user
+        if not school_id:
+            success, user_info = self.test_get_current_user()
+            if success and user_info and user_info.get('school_id'):
+                school_id = user_info['school_id']
+            else:
+                print("⚠️ Warning: No school_id available for book creation")
+                return books_created
         
         # Create a physical book
         physical_book_data = {
@@ -350,6 +359,7 @@ class SchoolLibraryAPITester:
             "language": "fr",
             "format": "physical",
             "price": 12.50,
+            "school_id": school_id,
             "physical_copies": 2
         }
         
@@ -374,6 +384,7 @@ class SchoolLibraryAPITester:
             "language": "fr",
             "format": "digital",
             "price": 0.0,
+            "school_id": school_id,
             "physical_copies": 0
         }
         
@@ -398,6 +409,7 @@ class SchoolLibraryAPITester:
             "language": "fr",
             "format": "both",
             "price": 8.99,
+            "school_id": school_id,
             "physical_copies": 1
         }
         
