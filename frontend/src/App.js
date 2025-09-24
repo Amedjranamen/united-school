@@ -543,6 +543,559 @@ const RegisterSchool = () => {
   );
 };
 
+// Manage Books component
+const ManageBooks = () => {
+  const { user, token } = useAuth();
+  const { toast } = useToast();
+  const [books, setBooks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editingBook, setEditingBook] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterFormat, setFilterFormat] = useState('all');
+  const [formData, setFormData] = useState({
+    title: '',
+    authors: [],
+    isbn: '',
+    description: '',
+    categories: [],
+    language: 'fr',
+    format: 'physical',
+    price: 0,
+    cover_image: '',
+    physical_copies: 0
+  });
+  const [authorInput, setAuthorInput] = useState('');
+  const [categoryInput, setCategoryInput] = useState('');
+  const [uploadingFile, setUploadingFile] = useState(false);
+
+  useEffect(() => {
+    fetchBooks();
+  }, [token, user.school_id]);
+
+  const fetchBooks = async () => {
+    try {
+      let url = `${API}/books`;
+      if (user.role !== 'super_admin' && user.school_id) {
+        url += `?school_id=${user.school_id}`;
+      }
+      
+      const response = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setBooks(response.data);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de charger les livres"
+      });
+    }
+    setLoading(false);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      title: '',
+      authors: [],
+      isbn: '',
+      description: '',
+      categories: [],
+      language: 'fr',
+      format: 'physical',
+      price: 0,
+      cover_image: '',
+      physical_copies: 0
+    });
+    setAuthorInput('');
+    setCategoryInput('');
+    setEditingBook(null);
+  };
+
+  const handleAddAuthor = () => {
+    if (authorInput.trim() && !formData.authors.includes(authorInput.trim())) {
+      setFormData({
+        ...formData,
+        authors: [...formData.authors, authorInput.trim()]
+      });
+      setAuthorInput('');
+    }
+  };
+
+  const handleRemoveAuthor = (author) => {
+    setFormData({
+      ...formData,
+      authors: formData.authors.filter(a => a !== author)
+    });
+  };
+
+  const handleAddCategory = () => {
+    if (categoryInput.trim() && !formData.categories.includes(categoryInput.trim())) {
+      setFormData({
+        ...formData,
+        categories: [...formData.categories, categoryInput.trim()]
+      });
+      setCategoryInput('');
+    }
+  };
+
+  const handleRemoveCategory = (category) => {
+    setFormData({
+      ...formData,
+      categories: formData.categories.filter(c => c !== category)
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      if (editingBook) {
+        // Update existing book
+        await axios.put(`${API}/books/${editingBook.id}`, formData, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        toast({
+          title: "Livre modifié",
+          description: "Le livre a été modifié avec succès"
+        });
+      } else {
+        // Create new book
+        await axios.post(`${API}/books`, formData, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        toast({
+          title: "Livre ajouté",
+          description: "Le livre a été ajouté avec succès"
+        });
+      }
+      
+      fetchBooks();
+      setShowAddDialog(false);
+      setShowEditDialog(false);
+      resetForm();
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: error.response?.data?.detail || "Erreur lors de l'enregistrement"
+      });
+    }
+    setLoading(false);
+  };
+
+  const handleEdit = (book) => {
+    setEditingBook(book);
+    setFormData({
+      title: book.title,
+      authors: book.authors || [],
+      isbn: book.isbn || '',
+      description: book.description || '',
+      categories: book.categories || [],
+      language: book.language || 'fr',
+      format: book.format || 'physical',
+      price: book.price || 0,
+      cover_image: book.cover_image || '',
+      physical_copies: 0 // This would need to be calculated from copies
+    });
+    setShowEditDialog(true);
+  };
+
+  const handleDelete = async (bookId) => {
+    try {
+      await axios.delete(`${API}/books/${bookId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast({
+        title: "Livre supprimé",
+        description: "Le livre a été supprimé avec succès"
+      });
+      fetchBooks();
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de supprimer le livre"
+      });
+    }
+  };
+
+  const handleFileUpload = async (bookId, file) => {
+    if (!file) return;
+    
+    setUploadingFile(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      await axios.post(`${API}/books/${bookId}/upload-file`, formData, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      toast({
+        title: "Fichier uploadé",
+        description: "Le fichier numérique a été uploadé avec succès"
+      });
+      fetchBooks();
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Erreur lors de l'upload du fichier"
+      });
+    }
+    setUploadingFile(false);
+  };
+
+  const filteredBooks = books.filter(book => {
+    const matchesSearch = book.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         book.authors?.some(author => author.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                         book.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesFormat = filterFormat === 'all' || book.format === filterFormat;
+    
+    return matchesSearch && matchesFormat;
+  });
+
+  const BookForm = () => (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="title">Titre *</Label>
+          <Input
+            id="title"
+            value={formData.title}
+            onChange={(e) => setFormData({...formData, title: e.target.value})}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="isbn">ISBN</Label>
+          <Input
+            id="isbn"
+            value={formData.isbn}
+            onChange={(e) => setFormData({...formData, isbn: e.target.value})}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Auteurs</Label>
+        <div className="flex gap-2 mb-2">
+          <Input
+            placeholder="Nom de l'auteur"
+            value={authorInput}
+            onChange={(e) => setAuthorInput(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddAuthor())}
+          />
+          <Button type="button" onClick={handleAddAuthor}>
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {formData.authors.map((author, index) => (
+            <Badge key={index} variant="secondary" className="cursor-pointer" onClick={() => handleRemoveAuthor(author)}>
+              {author} ×
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Catégories</Label>
+        <div className="flex gap-2 mb-2">
+          <Input
+            placeholder="Catégorie"
+            value={categoryInput}
+            onChange={(e) => setCategoryInput(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCategory())}
+          />
+          <Button type="button" onClick={handleAddCategory}>
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {formData.categories.map((category, index) => (
+            <Badge key={index} variant="outline" className="cursor-pointer" onClick={() => handleRemoveCategory(category)}>
+              {category} ×
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="description">Description</Label>
+        <Textarea
+          id="description"
+          value={formData.description}
+          onChange={(e) => setFormData({...formData, description: e.target.value})}
+          rows={3}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="format">Format</Label>
+          <Select value={formData.format} onValueChange={(value) => setFormData({...formData, format: value})}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="physical">Physique</SelectItem>
+              <SelectItem value="digital">Numérique</SelectItem>
+              <SelectItem value="both">Les deux</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="language">Langue</Label>
+          <Select value={formData.language} onValueChange={(value) => setFormData({...formData, language: value})}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="fr">Français</SelectItem>
+              <SelectItem value="en">Anglais</SelectItem>
+              <SelectItem value="es">Espagnol</SelectItem>
+              <SelectItem value="de">Allemand</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {(formData.format === 'physical' || formData.format === 'both') && (
+          <div className="space-y-2">
+            <Label htmlFor="physical_copies">Exemplaires physiques</Label>
+            <Input
+              id="physical_copies"
+              type="number"
+              min="0"
+              value={formData.physical_copies}
+              onChange={(e) => setFormData({...formData, physical_copies: parseInt(e.target.value) || 0})}
+            />
+          </div>
+        )}
+      </div>
+
+      <div className="flex justify-end space-x-2">
+        <Button 
+          type="button" 
+          variant="outline" 
+          onClick={() => {
+            setShowAddDialog(false);
+            setShowEditDialog(false);
+            resetForm();
+          }}
+        >
+          Annuler
+        </Button>
+        <Button type="submit" disabled={loading}>
+          {loading ? 'Enregistrement...' : (editingBook ? 'Modifier' : 'Ajouter')}
+        </Button>
+      </div>
+    </form>
+  );
+
+  if (loading && books.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Gestion des livres</h1>
+          <p className="text-gray-600 mt-2">Gérez les livres de votre collection</p>
+        </div>
+        
+        <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+          <DialogTrigger asChild>
+            <Button className="bg-emerald-600 hover:bg-emerald-700">
+              <Plus className="h-4 w-4 mr-2" />
+              Ajouter un livre
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Ajouter un nouveau livre</DialogTitle>
+            </DialogHeader>
+            <BookForm />
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Modifier le livre</DialogTitle>
+            </DialogHeader>
+            <BookForm />
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Search and Filter Bar */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border mb-6">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Rechercher par titre, auteur ou description..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Select value={filterFormat} onValueChange={setFilterFormat}>
+              <SelectTrigger className="w-48">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Format" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les formats</SelectItem>
+                <SelectItem value="physical">Physique</SelectItem>
+                <SelectItem value="digital">Numérique</SelectItem>
+                <SelectItem value="both">Les deux</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+
+      {/* Books Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredBooks.map((book) => (
+          <Card key={book.id} className="group hover:shadow-lg transition-shadow">
+            <CardHeader className="pb-4">
+              <div className="flex justify-between items-start">
+                <div className="flex-1 min-w-0">
+                  <CardTitle className="text-lg truncate">{book.title}</CardTitle>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {book.authors?.join(', ') || 'Auteur inconnu'}
+                  </p>
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleEdit(book)}>
+                      <Edit className="h-4 w-4 mr-2" />
+                      Modifier
+                    </DropdownMenuItem>
+                    {(book.format === 'digital' || book.format === 'both') && (
+                      <DropdownMenuItem asChild>
+                        <label className="flex items-center cursor-pointer">
+                          <Upload className="h-4 w-4 mr-2" />
+                          Upload fichier
+                          <input
+                            type="file"
+                            accept=".pdf,.epub"
+                            className="hidden"
+                            onChange={(e) => e.target.files[0] && handleFileUpload(book.id, e.target.files[0])}
+                            disabled={uploadingFile}
+                          />
+                        </label>
+                      </DropdownMenuItem>
+                    )}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Supprimer
+                        </DropdownMenuItem>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Êtes-vous sûr de vouloir supprimer le livre "{book.title}" ? Cette action est irréversible.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Annuler</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDelete(book.id)}>
+                            Supprimer
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {book.categories && book.categories.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {book.categories.slice(0, 3).map((category, index) => (
+                      <Badge key={index} variant="outline" className="text-xs">
+                        {category}
+                      </Badge>
+                    ))}
+                    {book.categories.length > 3 && (
+                      <Badge variant="outline" className="text-xs">
+                        +{book.categories.length - 3}
+                      </Badge>
+                    )}
+                  </div>
+                )}
+                
+                <div className="flex items-center justify-between">
+                  <Badge 
+                    variant={book.format === 'physical' ? 'default' : book.format === 'digital' ? 'secondary' : 'outline'}
+                    className="text-xs"
+                  >
+                    {book.format === 'physical' ? 'Physique' : book.format === 'digital' ? 'Numérique' : 'Hybride'}
+                  </Badge>
+                  <div className="text-sm text-gray-500">
+                    {book.language === 'fr' ? 'Français' : book.language.toUpperCase()}
+                  </div>
+                </div>
+
+                {book.description && (
+                  <p className="text-sm text-gray-600 line-clamp-3">
+                    {book.description}
+                  </p>
+                )}
+
+                <div className="text-xs text-gray-400 border-t pt-3">
+                  Ajouté le {new Date(book.created_at).toLocaleDateString()}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {filteredBooks.length === 0 && (
+        <div className="text-center py-12">
+          <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Aucun livre trouvé</h3>
+          <p className="text-gray-600 mb-4">
+            {searchTerm || filterFormat !== 'all' 
+              ? "Aucun livre ne correspond à vos critères de recherche."
+              : "Commencez par ajouter votre premier livre."}
+          </p>
+          {(!searchTerm && filterFormat === 'all') && (
+            <Button onClick={() => setShowAddDialog(true)} className="bg-emerald-600 hover:bg-emerald-700">
+              <Plus className="h-4 w-4 mr-2" />
+              Ajouter un livre
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
 // Dashboard component
 const Dashboard = () => {
   const { user, token } = useAuth();
