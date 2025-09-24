@@ -730,25 +730,36 @@ const ManageBooks = () => {
     uploadFormData.append('file', file);
 
     try {
+      // Afficher un toast de début d'upload
+      toast({
+        title: "Upload en cours...",
+        description: `Téléchargement de ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`
+      });
+
       await axios.post(`${API}/books/${bookId}/upload-file`, uploadFormData, {
         headers: { 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
         }
       });
+      
       toast({
         title: "Fichier uploadé",
-        description: "Le fichier numérique a été uploadé avec succès"
+        description: `Le fichier "${file.name}" a été uploadé avec succès`
       });
+      
+      // Rafraîchir la liste des livres pour mettre à jour l'indicateur
       fetchBooks();
     } catch (error) {
+      console.error('Upload error:', error);
       toast({
         variant: "destructive",
-        title: "Erreur",
-        description: "Erreur lors de l'upload du fichier"
+        title: "Erreur d'upload",
+        description: error.response?.data?.detail || "Erreur lors de l'upload du fichier. Vérifiez le format (PDF/EPUB)."
       });
+    } finally {
+      setUploadingFile(false);
     }
-    setUploadingFile(false);
   };
 
   const filteredBooks = books.filter(book => {
