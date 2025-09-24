@@ -301,19 +301,19 @@ class SchoolLibraryAPITester:
         saved_token = self.token
         self.token = None
         
-        # Test protected endpoints
+        # Test protected endpoints (FastAPI HTTPBearer returns 403, not 401)
         success1, _ = self.run_test(
             "Unauthorized Access to /auth/me",
             "GET",
             "auth/me",
-            401
+            403
         )
         
         success2, _ = self.run_test(
             "Unauthorized Access to Reserve Book",
             "POST",
             "loans/reserve",
-            401,
+            403,
             data={"book_id": "test-book-id"}
         )
         
@@ -321,14 +321,14 @@ class SchoolLibraryAPITester:
             "Unauthorized Access to Download Book",
             "POST",
             "books/test-book-id/download",
-            401
+            403
         )
         
         success4, _ = self.run_test(
             "Unauthorized Access to Serve Book File",
             "GET",
             "books/test-book-id/file",
-            401
+            403
         )
         
         # Restore token
