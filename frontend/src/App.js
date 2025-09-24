@@ -1015,20 +1015,31 @@ const ManageBooks = () => {
                       <Edit className="h-4 w-4 mr-2" />
                       Modifier
                     </DropdownMenuItem>
+                    
                     {(book.format === 'digital' || book.format === 'both') && (
-                      <DropdownMenuItem asChild>
-                        <label className="flex items-center cursor-pointer">
-                          <Upload className="h-4 w-4 mr-2" />
-                          Upload fichier
-                          <input
-                            type="file"
-                            accept=".pdf,.epub"
-                            className="hidden"
-                            onChange={(e) => e.target.files[0] && handleFileUpload(book.id, e.target.files[0])}
-                            disabled={uploadingFile}
-                          />
-                        </label>
-                      </DropdownMenuItem>
+                      <>
+                        {book.file_path ? (
+                          <DropdownMenuItem onClick={() => handleDownload(book.id)}>
+                            <Download className="h-4 w-4 mr-2" />
+                            Télécharger fichier
+                          </DropdownMenuItem>
+                        ) : null}
+                        
+                        <DropdownMenuItem asChild>
+                          <label className={`flex items-center cursor-pointer ${uploadingFile ? 'opacity-50' : ''}`}>
+                            <Upload className="h-4 w-4 mr-2" />
+                            {book.file_path ? 'Remplacer fichier' : 'Upload fichier'}
+                            {uploadingFile && <span className="ml-2 text-xs">(En cours...)</span>}
+                            <input
+                              type="file"
+                              accept=".pdf,.epub"
+                              className="hidden"
+                              onChange={(e) => e.target.files[0] && handleFileUpload(book.id, e.target.files[0])}
+                              disabled={uploadingFile}
+                            />
+                          </label>
+                        </DropdownMenuItem>
+                      </>
                     )}
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
