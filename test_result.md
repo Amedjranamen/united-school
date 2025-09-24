@@ -126,6 +126,9 @@ backend:
         - working: true
           agent: "main"
           comment: "Authentification JWT fonctionnelle avec tous les rôles"
+        - working: true
+          agent: "testing"
+          comment: "✅ TESTÉ COMPLET: Inscription utilisateur (100%), login multi-rôles (100%), JWT tokens (100%), protection endpoints (100%). Tous les rôles fonctionnent: user, school_admin, super_admin."
 
   - task: "API inscription/validation écoles"
     implemented: true
@@ -138,10 +141,13 @@ backend:
         - working: true
           agent: "main"
           comment: "Inscription école avec statut pending/approved/rejected"
+        - working: true
+          agent: "testing"
+          comment: "✅ TESTÉ COMPLET: Inscription école (100%), changement statut pending→approved→rejected→pending (100%), permissions super_admin (100%), protection non-super_admin (100%)."
 
   - task: "API gestion livres et exemplaires"
     implemented: true
-    working: true
+    working: false
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
@@ -150,6 +156,9 @@ backend:
         - working: true
           agent: "main"
           comment: "CRUD livres, upload fichiers, gestion exemplaires physiques"
+        - working: false
+          agent: "testing"
+          comment: "❌ PROBLÈME CRITIQUE: Création livres (100%), listing (100%), CRUD (100%) OK, MAIS upload fichiers numériques ne fonctionne pas - les livres numériques n'ont pas de file_path après création, causant erreur 404 'Fichier non disponible'."
 
   - task: "API système d'emprunts"
     implemented: true
@@ -162,6 +171,9 @@ backend:
         - working: true
           agent: "main"
           comment: "Gestion prêts/retours avec statuts et réservations"
+        - working: true
+          agent: "testing"
+          comment: "✅ TESTÉ COMPLET: Réservation exemplaires physiques (100%), prévention double réservation (100%), changement statuts reserved→borrowed→returned (100%), endpoint /loans/my (100%)."
 
   - task: "API dashboard statistiques"
     implemented: true
@@ -174,6 +186,9 @@ backend:
         - working: true
           agent: "main"
           comment: "Statistiques par rôle utilisateur"
+        - working: true
+          agent: "testing"
+          comment: "✅ TESTÉ COMPLET: Dashboard super_admin (écoles, utilisateurs, livres totaux) (100%), dashboard school_admin (livres école, emprunts actifs) (100%), dashboard user (mes emprunts) (100%)."
 
 frontend:
   - task: "Interface d'authentification"
