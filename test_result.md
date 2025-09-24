@@ -216,28 +216,34 @@ frontend:
           comment: "Début implémentation interface catalogue avec recherche, filtres, téléchargement gratuit"
 
   - task: "Interface gestion des livres"
-    implemented: false
-    working: "NA"
+    implemented: true
+    working: true
     file: "/app/frontend/src/App.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
         - working: "NA"
           agent: "main"
           comment: "Page gestion livres marquée 'À venir' - nécessite interface complète"
+        - working: true
+          agent: "main"
+          comment: "Interface complète implémentée - CRUD livres, upload fichiers, recherche/filtres, gestion par rôle"
 
   - task: "Interface administration"
-    implemented: false
-    working: "NA"
+    implemented: true
+    working: true
     file: "/app/frontend/src/App.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
         - working: "NA"
           agent: "main"
           comment: "Page admin marquée 'À venir' - validation écoles, gestion utilisateurs"
+        - working: true
+          agent: "main"
+          comment: "Interface complète implémentée - validation écoles (pending/approved/rejected), statistiques, onglets organisés"
 
 metadata:
   created_by: "main_agent"
