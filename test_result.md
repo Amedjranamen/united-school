@@ -206,11 +206,14 @@ frontend:
     file: "/app/frontend/src/App.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
         - working: "NA"
           agent: "main"
           comment: "Page catalogue marquée 'À venir' - nécessite implémentation complète"
+        - working: "NA"
+          agent: "main"
+          comment: "Début implémentation interface catalogue avec recherche, filtres, téléchargement gratuit"
 
   - task: "Interface gestion des livres"
     implemented: false
