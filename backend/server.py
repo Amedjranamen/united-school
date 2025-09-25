@@ -58,9 +58,13 @@ class BookFormat(str, Enum):
     BOTH = "both"
 
 class LoanStatus(str, Enum):
-    RESERVED = "reserved"
-    BORROWED = "borrowed"
-    RETURNED = "returned"
+    PENDING_APPROVAL = "pending_approval"  # Demande en attente de validation admin
+    APPROVED = "approved"  # Approuvé par admin, en attente de retrait
+    RESERVED = "reserved"  # Réservé (ancien système - garde pour compatibilité)
+    BORROWED = "borrowed"  # Emprunté
+    RETURNED = "returned"  # Rendu, en attente de validation du rapport
+    COMPLETED = "completed"  # Rapport validé par admin, processus terminé
+    REJECTED = "rejected"  # Demande rejetée par admin
     OVERDUE = "overdue"
 
 # Pydantic Models
