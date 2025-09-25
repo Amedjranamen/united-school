@@ -144,6 +144,10 @@ class LoanBase(BaseModel):
 class LoanCreate(LoanBase):
     pass
 
+class LoanStatusUpdate(BaseModel):
+    status: LoanStatus
+    admin_notes: Optional[str] = None
+
 class Loan(LoanBase):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     status: LoanStatus = LoanStatus.PENDING_APPROVAL
