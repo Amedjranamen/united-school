@@ -484,6 +484,27 @@ async def get_all_loans(current_user: User = Depends(get_current_user)):
     
     return [Loan(**parse_from_mongo(loan)) for loan in loans]
 
+# Get user by ID (for admin purposes)
+@api_router.get("/users/{user_id}")
+async def get_user_by_id(user_id: str, current_user: User = Depends(get_current_user)):
+    if current_user.role not in [UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.LIBRARIAN]:
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+    
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        return {"id": user_id, "full_name": "Utilisateur supprimé", "email": ""}
+    
+    return {"id": user["id"], "full_name": user["full_name"], "email": user["email"]}
+
+# Get book by ID
+@api_router.get("/books/{book_id}")
+async def get_book_by_id(book_id: str, current_user: User = Depends(get_current_user)):
+    book = await db.books.find_one({"id": book_id})
+    if not book:
+        return {"id": book_id, "title": "Livre supprimé", "author": ""}
+    
+    return Book(**parse_from_mongo(book))
+
 @api_router.put("/loans/{loan_id}/status")
 async def update_loan_status(loan_id: str, update_data: LoanStatusUpdate, current_user: User = Depends(get_current_user)):
     loan = await db.loans.find_one({"id": loan_id})
