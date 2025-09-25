@@ -1434,15 +1434,15 @@ const Catalogue = () => {
   const handleBookAction = async (book, action) => {
     try {
       if (action === 'borrow' && book.format === 'physical') {
-        // Reserve a physical copy
-        await axios.post(`${API}/loans/reserve`, {
+        // Create a loan request that requires admin approval
+        await axios.post(`${API}/loans/request`, {
           book_id: book.id
         }, {
           headers: { Authorization: `Bearer ${token}` }
         });
         toast({
-          title: "Réservation effectuée",
-          description: `Le livre "${book.title}" a été réservé avec succès`
+          title: "Demande d'emprunt envoyée",
+          description: `Votre demande d'emprunt pour "${book.title}" a été envoyée. Elle doit être validée par un administrateur.`
         });
       } else if (action === 'download' && book.format === 'digital') {
         // Generate download link for digital book
