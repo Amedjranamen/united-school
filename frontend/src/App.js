@@ -1941,7 +1941,7 @@ const Catalogue = () => {
                     ) : (
                       <>
                         <Book className="h-4 w-4 mr-2" />
-                        Emprunter ce livre
+                        Demander cet emprunt
                       </>
                     )}
                   </Button>
