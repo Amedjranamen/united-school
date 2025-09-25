@@ -10,7 +10,7 @@ import json
 from datetime import datetime
 
 class CatalogInterfaceTest:
-    def __init__(self, base_url="https://biblioschool-4.preview.emergentagent.com"):
+    def __init__(self, base_url="https://biblioplus.preview.emergentagent.com"):
         self.base_url = base_url
         self.api_url = f"{base_url}/api"
         self.token = None
