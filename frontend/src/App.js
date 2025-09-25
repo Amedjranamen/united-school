@@ -2812,6 +2812,14 @@ function App() {
                 } 
               />
               <Route 
+                path="/manage-loans" 
+                element={
+                  <ProtectedRoute roles={['school_admin', 'librarian', 'super_admin']}>
+                    <ManageLoans />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
                 path="/admin" 
                 element={
                   <ProtectedRoute roles={['super_admin']}>
