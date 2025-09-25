@@ -183,6 +183,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -193,7 +194,7 @@ const Login = () => {
     if (result.success) {
       toast({ title: "Connexion réussie", description: "Bienvenue !" });
       // Redirection vers le dashboard après connexion réussie
-      window.location.href = '/dashboard';
+      navigate('/dashboard');
     } else {
       toast({ 
         variant: "destructive",
