@@ -694,6 +694,323 @@ class SchoolLibraryAPITester:
         
         return books_created
 
+    def test_complete_loan_workflow_with_admin_validation(self):
+        """Test the complete new loan workflow with admin validation"""
+        print("\n🎯 TESTING COMPLETE LOAN WORKFLOW WITH ADMIN VALIDATION")
+        print("=" * 60)
+        
+        # Step 1: Get current user info to find school_id
+        success, user_info = self.test_get_current_user()
+        if not success or not user_info:
+            print("❌ Failed to get current user info")
+            return False
+        
+        user_id = user_info['id']
+        school_id = user_info.get('school_id')
+        
+        if not school_id:
+            print("⚠️ Warning: User has no school_id, creating test book without school restriction")
+        
+        # Step 2: Create a physical book for testing
+        physical_book_data = {
+            "title": "Livre Test Workflow Emprunt",
+            "authors": ["Auteur Workflow"],
+            "isbn": "978-2-555555-55-5",
+            "description": "Livre pour tester le workflow complet d'emprunt avec validation admin",
+            "categories": ["Test", "Workflow"],
+            "language": "fr",
+            "format": "physical",
+            "price": 10.0,
+            "school_id": school_id or "test-school-id",
+            "physical_copies": 2
+        }
+        
+        print("\n📚 Step 1: Creating physical book for loan workflow test...")
+        success, book_response = self.run_test(
+            "Create Physical Book for Loan Workflow",
+            "POST",
+            "books",
+            200,
+            data=physical_book_data
+        )
+        
+        if not success or not book_response:
+            print("❌ Failed to create physical book - aborting workflow test")
+            return False
+        
+        book_id = book_response['id']
+        print(f"✅ Physical book created with ID: {book_id}")
+        
+        # Step 3: User requests loan (should create pending_approval status)
+        print("\n📋 Step 2: User requests book loan...")
+        success, loan_request_response = self.test_request_book_loan(book_id)
+        
+        if not success or not loan_request_response:
+            print("❌ Failed to request book loan")
+            return False
+        
+        loan_id = loan_request_response.get('loan_id')
+        if not loan_id:
+            print("❌ No loan_id returned from loan request")
+            return False
+        
+        print(f"✅ Loan request created with ID: {loan_id}")
+        print(f"   Status: {loan_request_response.get('status', 'unknown')}")
+        
+        # Step 4: Verify loan is in pending_approval status
+        print("\n🔍 Step 3: Verifying loan status is pending_approval...")
+        success, my_loans = self.test_get_my_loans()
+        
+        if success and my_loans:
+            current_loan = None
+            for loan in my_loans:
+                if loan['id'] == loan_id:
+                    current_loan = loan
+                    break
+            
+            if current_loan:
+                if current_loan['status'] == 'pending_approval':
+                    print("✅ Loan correctly in pending_approval status")
+                else:
+                    print(f"❌ Expected pending_approval, got {current_loan['status']}")
+                    return False
+            else:
+                print("❌ Loan not found in user's loans")
+                return False
+        else:
+            print("❌ Failed to get user's loans")
+            return False
+        
+        # Step 5: Switch to admin user to approve the loan
+        print("\n🎓 Step 4: Switching to admin user to approve loan...")
+        # Save current user token
+        user_token = self.token
+        
+        # Login as school admin (we'll use the one created during school registration)
+        admin_login_success = False
+        try:
+            # Try to login as school admin
+            admin_login_success, admin_info = self.test_school_admin_login()
+        except:
+            # If that fails, try super admin
+            admin_login_success, admin_info = self.test_super_admin_login()
+        
+        if not admin_login_success:
+            print("❌ Failed to login as admin - cannot test approval workflow")
+            self.token = user_token  # Restore user token
+            return False
+        
+        print("✅ Admin login successful")
+        
+        # Step 6: Admin gets all loans to see the pending request
+        print("\n📋 Step 5: Admin retrieves all loans...")
+        success, all_loans = self.test_get_all_loans_as_admin()
+        
+        if success and all_loans:
+            pending_loan = None
+            for loan in all_loans:
+                if loan['id'] == loan_id:
+                    pending_loan = loan
+                    break
+            
+            if pending_loan:
+                print(f"✅ Admin can see pending loan: {loan_id}")
+                print(f"   Status: {pending_loan['status']}")
+            else:
+                print("❌ Admin cannot see the pending loan")
+                self.token = user_token
+                return False
+        else:
+            print("❌ Admin failed to get loans list")
+            self.token = user_token
+            return False
+        
+        # Step 7: Admin approves the loan
+        print("\n✅ Step 6: Admin approves the loan...")
+        success, approval_response = self.test_update_loan_status(
+            loan_id, 
+            "approved", 
+            "Demande approuvée par l'administrateur"
+        )
+        
+        if not success:
+            print("❌ Failed to approve loan")
+            self.token = user_token
+            return False
+        
+        print("✅ Loan approved by admin")
+        
+        # Step 8: Admin marks loan as borrowed (user picked up the book)
+        print("\n📖 Step 7: Admin marks loan as borrowed...")
+        success, borrowed_response = self.test_update_loan_status(
+            loan_id,
+            "borrowed",
+            "Livre retiré par l'utilisateur"
+        )
+        
+        if not success:
+            print("❌ Failed to mark loan as borrowed")
+            self.token = user_token
+            return False
+        
+        print("✅ Loan marked as borrowed")
+        
+        # Step 9: Switch back to user to return the book
+        print("\n👤 Step 8: Switching back to user to return book...")
+        self.token = user_token
+        
+        # User marks book as returned
+        success, return_response = self.test_update_loan_status(
+            loan_id,
+            "returned",
+            "Livre rendu en bon état"
+        )
+        
+        if not success:
+            print("❌ User failed to mark book as returned")
+            return False
+        
+        print("✅ User marked book as returned")
+        
+        # Step 10: Switch back to admin to complete the workflow
+        print("\n🎓 Step 9: Admin validates return and completes workflow...")
+        # Switch back to admin
+        if admin_login_success:
+            admin_login_success, admin_info = self.test_school_admin_login()
+            if not admin_login_success:
+                admin_login_success, admin_info = self.test_super_admin_login()
+        
+        if not admin_login_success:
+            print("❌ Failed to re-login as admin")
+            return False
+        
+        # Admin completes the loan
+        success, complete_response = self.test_update_loan_status(
+            loan_id,
+            "completed",
+            "Retour validé, livre en bon état"
+        )
+        
+        if not success:
+            print("❌ Admin failed to complete loan")
+            return False
+        
+        print("✅ Admin completed the loan workflow")
+        
+        # Step 11: Verify final loan status
+        print("\n🔍 Step 10: Verifying final loan status...")
+        success, final_loans = self.test_get_all_loans_as_admin()
+        
+        if success and final_loans:
+            final_loan = None
+            for loan in final_loans:
+                if loan['id'] == loan_id:
+                    final_loan = loan
+                    break
+            
+            if final_loan and final_loan['status'] == 'completed':
+                print("✅ Loan workflow completed successfully!")
+                print(f"   Final status: {final_loan['status']}")
+                if final_loan.get('admin_notes'):
+                    print(f"   Admin notes: {final_loan['admin_notes']}")
+            else:
+                print(f"❌ Expected completed status, got {final_loan['status'] if final_loan else 'not found'}")
+                return False
+        else:
+            print("❌ Failed to verify final loan status")
+            return False
+        
+        # Restore user token
+        self.token = user_token
+        
+        print("\n🎯 COMPLETE LOAN WORKFLOW TEST COMPLETED SUCCESSFULLY")
+        self.log_test("Complete Loan Workflow with Admin Validation", True, "All workflow steps completed: pending_approval → approved → borrowed → returned → completed")
+        return True
+
+    def test_loan_rejection_workflow(self):
+        """Test loan rejection by admin"""
+        print("\n🚫 TESTING LOAN REJECTION WORKFLOW")
+        print("=" * 40)
+        
+        # Get current user info
+        success, user_info = self.test_get_current_user()
+        if not success or not user_info:
+            print("❌ Failed to get current user info")
+            return False
+        
+        school_id = user_info.get('school_id')
+        
+        # Create a physical book
+        physical_book_data = {
+            "title": "Livre Test Rejet",
+            "authors": ["Auteur Rejet"],
+            "isbn": "978-2-666666-66-6",
+            "description": "Livre pour tester le rejet de demande d'emprunt",
+            "categories": ["Test", "Rejet"],
+            "language": "fr",
+            "format": "physical",
+            "price": 8.0,
+            "school_id": school_id or "test-school-id",
+            "physical_copies": 1
+        }
+        
+        print("\n📚 Creating book for rejection test...")
+        success, book_response = self.run_test(
+            "Create Book for Rejection Test",
+            "POST",
+            "books",
+            200,
+            data=physical_book_data
+        )
+        
+        if not success or not book_response:
+            print("❌ Failed to create book")
+            return False
+        
+        book_id = book_response['id']
+        
+        # User requests loan
+        print("\n📋 User requests loan...")
+        success, loan_request_response = self.test_request_book_loan(book_id)
+        
+        if not success or not loan_request_response:
+            print("❌ Failed to request loan")
+            return False
+        
+        loan_id = loan_request_response.get('loan_id')
+        
+        # Switch to admin and reject
+        print("\n🎓 Admin rejects the loan...")
+        user_token = self.token
+        
+        admin_login_success, admin_info = self.test_school_admin_login()
+        if not admin_login_success:
+            admin_login_success, admin_info = self.test_super_admin_login()
+        
+        if not admin_login_success:
+            print("❌ Failed to login as admin")
+            self.token = user_token
+            return False
+        
+        success, rejection_response = self.test_update_loan_status(
+            loan_id,
+            "rejected",
+            "Demande rejetée - livre non disponible"
+        )
+        
+        if not success:
+            print("❌ Failed to reject loan")
+            self.token = user_token
+            return False
+        
+        print("✅ Loan rejected successfully")
+        
+        # Restore user token
+        self.token = user_token
+        
+        self.log_test("Loan Rejection Workflow", True, "Admin successfully rejected loan request")
+        return True
+
     def run_all_tests(self):
         """Run all API tests"""
         print("🚀 Starting School Library API Tests")
@@ -761,19 +1078,37 @@ class SchoolLibraryAPITester:
             print("\n🎯 PRIORITY TEST: File Upload Functionality...")
             self.test_complete_digital_book_flow()
 
-        # Test 13-17: Test catalog interface endpoints with authentication
+        # Test 13: NEW LOAN WORKFLOW TESTS (CRITICAL PRIORITY)
+        if user_success and test_user and school_admin_success:
+            print("\n🎯 CRITICAL PRIORITY: NEW LOAN WORKFLOW WITH ADMIN VALIDATION")
+            
+            # Re-authenticate as test user
+            print("\n🔐 Re-authenticating test user for loan workflow tests...")
+            login_success, user_info = self.test_user_login(test_user['email'], test_user['password'])
+            
+            if login_success:
+                # Test complete loan workflow
+                self.test_complete_loan_workflow_with_admin_validation()
+                
+                # Test loan rejection workflow
+                self.test_loan_rejection_workflow()
+                
+                # Test edge cases
+                print("\n❌ Testing Loan Request Edge Cases...")
+                self.test_request_nonexistent_book()
+                self.test_request_without_book_id()
+                
+                # Test user permissions
+                print("\n🔒 Testing User Permissions for Loan Management...")
+                self.test_get_all_loans_as_user()  # Should fail with 403
+
+        # Test 14-17: Test catalog interface endpoints with authentication
         if user_success and test_user:
             print("\n🔐 Re-authenticating test user for catalog tests...")
             login_success, user_info = self.test_user_login(test_user['email'], test_user['password'])
             
             if login_success and test_books:
                 print("\n📚 Testing Catalog Interface Endpoints...")
-                
-                # Test book reservation (physical books)
-                physical_books = [book for book in test_books if book['type'] in ['physical', 'both']]
-                if physical_books:
-                    print("\n📋 Testing Book Reservation...")
-                    self.test_reserve_physical_book(physical_books[0]['data']['id'])
                 
                 # Test digital book download
                 digital_books = [book for book in test_books if book['type'] in ['digital', 'both']]
@@ -786,8 +1121,6 @@ class SchoolLibraryAPITester:
                 
                 # Test error cases
                 print("\n❌ Testing Error Cases...")
-                self.test_reserve_nonexistent_book()
-                self.test_reserve_without_book_id()
                 self.test_download_nonexistent_book()
                 self.test_serve_nonexistent_book_file()
 
