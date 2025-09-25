@@ -192,6 +192,8 @@ const Login = () => {
     
     if (result.success) {
       toast({ title: "Connexion réussie", description: "Bienvenue !" });
+      // Redirection vers le dashboard après connexion réussie
+      window.location.href = '/dashboard';
     } else {
       toast({ 
         variant: "destructive",
