@@ -306,10 +306,7 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus:
-    - "API gestion livres et exemplaires"
-    - "Interface catalogue complet" 
-    - "Interface gestion des livres"
+  current_focus: []
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
