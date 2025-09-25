@@ -532,9 +532,9 @@ async def upload_book_file(
     
     return {"message": "Fichier uploadé avec succès", "file_path": str(file_path)}
 
-# Book reservation endpoint (for physical books)
-@api_router.post("/loans/reserve")
-async def reserve_book(
+# Book reservation endpoint (for physical books) - Now creates approval request
+@api_router.post("/loans/request")
+async def request_book_loan(
     request_data: dict,
     current_user: User = Depends(get_current_user)
 ):
@@ -551,47 +551,41 @@ async def reserve_book(
     if book["format"] not in [BookFormat.PHYSICAL, BookFormat.BOTH]:
         raise HTTPException(status_code=400, detail="Ce livre n'est pas disponible en format physique")
     
-    # Check if user already has a reservation for this book
+    # Check if user already has an active request/loan for this book
     existing_loan = await db.loans.find_one({
         "book_id": book_id,
         "user_id": current_user.id,
-        "status": {"$in": [LoanStatus.RESERVED, LoanStatus.BORROWED]}
+        "status": {"$in": [LoanStatus.PENDING_APPROVAL, LoanStatus.APPROVED, LoanStatus.RESERVED, LoanStatus.BORROWED]}
     })
     if existing_loan:
-        raise HTTPException(status_code=400, detail="Vous avez déjà une réservation ou un emprunt actif pour ce livre")
+        raise HTTPException(status_code=400, detail="Vous avez déjà une demande ou un emprunt actif pour ce livre")
     
-    # Find available copy
-    available_copy = await db.book_copies.find_one({
+    # Check if there are available copies
+    available_copies_count = await db.book_copies.count_documents({
         "book_id": book_id,
         "status": "available"
     })
-    if not available_copy:
+    if available_copies_count == 0:
         raise HTTPException(status_code=400, detail="Aucun exemplaire disponible pour ce livre")
     
-    # Create loan with reserved status
+    # Create loan request with pending approval status
     due_date = datetime.now(timezone.utc) + timedelta(days=14)  # 14 days loan period
     loan = Loan(
         book_id=book_id,
-        copy_id=available_copy["id"],
+        copy_id=None,  # Will be assigned when approved
         user_id=current_user.id,
         due_date=due_date,
-        status=LoanStatus.RESERVED
+        status=LoanStatus.PENDING_APPROVAL
     )
     
-    # Reserve the copy
-    await db.book_copies.update_one(
-        {"id": available_copy["id"]},
-        {"$set": {"status": "reserved"}}
-    )
-    
-    # Insert loan
+    # Insert loan request
     loan_mongo = prepare_for_mongo(loan.dict())
     await db.loans.insert_one(loan_mongo)
     
     return {
-        "message": "Livre réservé avec succès",
+        "message": "Demande d'emprunt soumise avec succès. En attente de validation par un administrateur.",
         "loan_id": loan.id,
-        "due_date": due_date.isoformat(),
+        "status": "pending_approval",
         "book_title": book["title"]
     }
 
