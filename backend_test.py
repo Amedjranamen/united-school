@@ -222,36 +222,101 @@ class SchoolLibraryAPITester:
         )
         return success, response if success else None
 
-    def test_reserve_physical_book(self, book_id):
-        """Test reserving a physical book"""
+    def test_request_book_loan(self, book_id):
+        """Test requesting a book loan (new system)"""
         success, response = self.run_test(
-            f"Reserve Physical Book ({book_id})",
+            f"Request Book Loan ({book_id})",
             "POST",
-            "loans/reserve",
+            "loans/request",
             200,
             data={"book_id": book_id}
         )
         return success, response if success else None
 
-    def test_reserve_nonexistent_book(self):
-        """Test reserving a non-existent book (should return 404)"""
+    def test_request_nonexistent_book(self):
+        """Test requesting a non-existent book (should return 404)"""
         success, response = self.run_test(
-            "Reserve Non-existent Book",
+            "Request Non-existent Book",
             "POST",
-            "loans/reserve",
+            "loans/request",
             404,
             data={"book_id": "nonexistent-book-id"}
         )
         return success, response if success else None
 
-    def test_reserve_without_book_id(self):
-        """Test reservation without book_id (should return 400)"""
+    def test_request_without_book_id(self):
+        """Test loan request without book_id (should return 400)"""
         success, response = self.run_test(
-            "Reserve Without Book ID",
+            "Request Without Book ID",
             "POST",
-            "loans/reserve",
+            "loans/request",
             400,
             data={}
+        )
+        return success, response if success else None
+
+    def test_get_all_loans_as_admin(self):
+        """Test getting all loans as admin"""
+        success, response = self.run_test(
+            "Get All Loans (Admin)",
+            "GET",
+            "loans",
+            200
+        )
+        return success, response if success else None
+
+    def test_get_all_loans_as_user(self):
+        """Test getting all loans as regular user (should return 403)"""
+        success, response = self.run_test(
+            "Get All Loans (User - Should Fail)",
+            "GET",
+            "loans",
+            403
+        )
+        return success, response if success else None
+
+    def test_get_my_loans(self):
+        """Test getting my loans"""
+        success, response = self.run_test(
+            "Get My Loans",
+            "GET",
+            "loans/my",
+            200
+        )
+        return success, response if success else None
+
+    def test_update_loan_status(self, loan_id, status, admin_notes=None):
+        """Test updating loan status"""
+        data = {"status": status}
+        if admin_notes:
+            data["admin_notes"] = admin_notes
+        
+        success, response = self.run_test(
+            f"Update Loan Status ({loan_id}) to {status}",
+            "PUT",
+            f"loans/{loan_id}/status",
+            200,
+            data=data
+        )
+        return success, response if success else None
+
+    def test_get_user_by_id(self, user_id):
+        """Test getting user by ID (admin endpoint)"""
+        success, response = self.run_test(
+            f"Get User by ID ({user_id})",
+            "GET",
+            f"users/{user_id}",
+            200
+        )
+        return success, response if success else None
+
+    def test_get_user_by_id_as_regular_user(self, user_id):
+        """Test getting user by ID as regular user (should return 403)"""
+        success, response = self.run_test(
+            f"Get User by ID as Regular User ({user_id}) - Should Fail",
+            "GET",
+            f"users/{user_id}",
+            403
         )
         return success, response if success else None
 
