@@ -281,6 +281,18 @@ frontend:
           agent: "main"
           comment: "Interface complète implémentée - validation écoles (pending/approved/rejected), statistiques, onglets organisés"
 
+  - task: "Interface gestion des emprunts"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/App.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "NOUVELLE INTERFACE COMPLÈTE: ManageLoans avec 4 onglets (En attente, Actifs, Retours, Terminés), validation demandes d'emprunt, validation rapports de retour avec notes admin, accessible aux school_admin/librarian/super_admin via /manage-loans"
+
 metadata:
   created_by: "main_agent"
   version: "1.0"
