@@ -200,11 +200,17 @@ frontend:
     file: "/app/frontend/src/App.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
         - working: true
           agent: "main"
           comment: "Login/register/register-school fonctionnels"
+        - working: false
+          agent: "user"
+          comment: "PROBLÈME: Connexion ne redirige pas - reste sur page login après connexion réussie"
+        - working: true
+          agent: "main" 
+          comment: "PROBLÈME RÉSOLU: Remplacé window.location.href par useNavigate() pour redirection correcte vers dashboard après connexion"
 
   - task: "Dashboard multi-rôles"
     implemented: true
