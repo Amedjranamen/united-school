@@ -146,9 +146,11 @@ class LoanCreate(LoanBase):
 
 class Loan(LoanBase):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    status: LoanStatus = LoanStatus.RESERVED
+    status: LoanStatus = LoanStatus.PENDING_APPROVAL
     borrowed_at: Optional[datetime] = None
     returned_at: Optional[datetime] = None
+    return_report: Optional[str] = None  # Rapport de retour soumis par l'utilisateur
+    admin_notes: Optional[str] = None  # Notes de l'admin lors de validation
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class Token(BaseModel):
