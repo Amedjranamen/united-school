@@ -1575,7 +1575,7 @@ const Catalogue = () => {
             ) : (
               <>
                 <Book className="h-4 w-4 mr-1" />
-                Emprunter
+                Demander
               </>
             )}
           </Button>
