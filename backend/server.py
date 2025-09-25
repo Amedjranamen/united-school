@@ -485,35 +485,72 @@ async def get_all_loans(current_user: User = Depends(get_current_user)):
     return [Loan(**parse_from_mongo(loan)) for loan in loans]
 
 @api_router.put("/loans/{loan_id}/status")
-async def update_loan_status(loan_id: str, status: LoanStatus, current_user: User = Depends(get_current_user)):
+async def update_loan_status(loan_id: str, update_data: LoanStatusUpdate, current_user: User = Depends(get_current_user)):
     loan = await db.loans.find_one({"id": loan_id})
     if not loan:
         raise HTTPException(status_code=404, detail="Emprunt introuvable")
     
     # Check permissions
-    if current_user.role not in [UserRole.SCHOOL_ADMIN, UserRole.LIBRARIAN] and loan["user_id"] != current_user.id:
+    if current_user.role not in [UserRole.SCHOOL_ADMIN, UserRole.LIBRARIAN, UserRole.SUPER_ADMIN] and loan["user_id"] != current_user.id:
         raise HTTPException(status_code=403, detail="Vous n'êtes pas autorisé à modifier cet emprunt")
     
-    update_data = {"status": status}
+    # Regular users can only return their own loans
+    if current_user.role == UserRole.USER and loan["user_id"] == current_user.id:
+        if update_data.status != LoanStatus.RETURNED:
+            raise HTTPException(status_code=403, detail="Vous ne pouvez que retourner vos propres emprunts")
     
-    if status == LoanStatus.BORROWED:
-        update_data["borrowed_at"] = datetime.now(timezone.utc).isoformat()
+    update_fields = {"status": update_data.status}
+    
+    if update_data.admin_notes and current_user.role in [UserRole.SCHOOL_ADMIN, UserRole.LIBRARIAN, UserRole.SUPER_ADMIN]:
+        update_fields["admin_notes"] = update_data.admin_notes
+    
+    if update_data.status == LoanStatus.APPROVED:
+        # When approved, find an available copy and reserve it
+        book = await db.books.find_one({"id": loan["book_id"]})
+        if book and book["format"] in [BookFormat.PHYSICAL, BookFormat.BOTH]:
+            available_copy = await db.book_copies.find_one({
+                "book_id": loan["book_id"],
+                "status": "available"
+            })
+            if available_copy:
+                await db.book_copies.update_one(
+                    {"id": available_copy["id"]},
+                    {"$set": {"status": "reserved"}}
+                )
+                update_fields["copy_id"] = available_copy["id"]
+            else:
+                raise HTTPException(status_code=400, detail="Aucun exemplaire disponible")
+    
+    elif update_data.status == LoanStatus.BORROWED:
+        update_fields["borrowed_at"] = datetime.now(timezone.utc).isoformat()
         # Update copy status
-        if loan["copy_id"]:
+        if loan.get("copy_id"):
             await db.book_copies.update_one(
                 {"id": loan["copy_id"]},
                 {"$set": {"status": "borrowed"}}
             )
-    elif status == LoanStatus.RETURNED:
-        update_data["returned_at"] = datetime.now(timezone.utc).isoformat()
-        # Update copy status
-        if loan["copy_id"]:
+    
+    elif update_data.status == LoanStatus.RETURNED:
+        update_fields["returned_at"] = datetime.now(timezone.utc).isoformat()
+        # Don't mark copy as available yet - wait for admin validation
+    
+    elif update_data.status == LoanStatus.COMPLETED:
+        # Admin validates the return - mark copy as available
+        if loan.get("copy_id"):
             await db.book_copies.update_one(
                 {"id": loan["copy_id"]},
                 {"$set": {"status": "available"}}
             )
     
-    result = await db.loans.update_one({"id": loan_id}, {"$set": update_data})
+    elif update_data.status == LoanStatus.REJECTED:
+        # If rejecting an approved loan, make copy available again
+        if loan.get("copy_id") and loan.get("status") in [LoanStatus.APPROVED, LoanStatus.PENDING_APPROVAL]:
+            await db.book_copies.update_one(
+                {"id": loan["copy_id"]},
+                {"$set": {"status": "available"}}
+            )
+    
+    result = await db.loans.update_one({"id": loan_id}, {"$set": update_fields})
     
     return {"message": "Statut de l'emprunt mis à jour"}
 
