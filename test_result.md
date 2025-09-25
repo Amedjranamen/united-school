@@ -169,7 +169,7 @@ backend:
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
         - working: true
           agent: "main"
@@ -177,6 +177,12 @@ backend:
         - working: true
           agent: "testing"
           comment: "✅ TESTÉ COMPLET: Réservation exemplaires physiques (100%), prévention double réservation (100%), changement statuts reserved→borrowed→returned (100%), endpoint /loans/my (100%)."
+        - working: false
+          agent: "user"
+          comment: "PROBLÈME: Workflow emprunt incorrect - il faut validation admin pour emprunter + admin doit valider rapport du livre"
+        - working: true
+          agent: "main"
+          comment: "SYSTÈME COMPLÈTEMENT REFAIT: Nouveau workflow avec validation admin obligatoire (pending_approval→approved→borrowed→returned→completed), LoanStatusUpdate avec admin_notes, nouveaux endpoints GET /loans et /users/{id}"
 
   - task: "API dashboard statistiques"
     implemented: true
