@@ -941,13 +941,23 @@ class SchoolLibraryAPITester:
         print("\n🚫 TESTING LOAN REJECTION WORKFLOW")
         print("=" * 40)
         
-        # Get current user info
-        success, user_info = self.test_get_current_user()
-        if not success or not user_info:
-            print("❌ Failed to get current user info")
+        # Save current user token
+        user_token = self.token
+        
+        # Step 1: Switch to admin to create a book
+        print("\n🎓 Step 1: Switching to admin to create test book...")
+        admin_login_success, admin_info = self.test_school_admin_login()
+        if not admin_login_success:
+            admin_login_success, admin_info = self.test_super_admin_login()
+        
+        if not admin_login_success:
+            print("❌ Failed to login as admin")
+            self.token = user_token
             return False
         
-        school_id = user_info.get('school_id')
+        # Get admin's school_id
+        success, admin_user_info = self.test_get_current_user()
+        admin_school_id = admin_user_info.get('school_id') if admin_user_info else None
         
         # Create a physical book
         physical_book_data = {
@@ -959,11 +969,11 @@ class SchoolLibraryAPITester:
             "language": "fr",
             "format": "physical",
             "price": 8.0,
-            "school_id": school_id or "test-school-id",
+            "school_id": admin_school_id or "test-school-id",
             "physical_copies": 1
         }
         
-        print("\n📚 Creating book for rejection test...")
+        print("\n📚 Step 2: Creating book for rejection test...")
         success, book_response = self.run_test(
             "Create Book for Rejection Test",
             "POST",
@@ -974,12 +984,17 @@ class SchoolLibraryAPITester:
         
         if not success or not book_response:
             print("❌ Failed to create book")
+            self.token = user_token
             return False
         
         book_id = book_response['id']
         
+        # Step 3: Switch back to user
+        print("\n👤 Step 3: Switching back to user...")
+        self.token = user_token
+        
         # User requests loan
-        print("\n📋 User requests loan...")
+        print("\n📋 Step 4: User requests loan...")
         success, loan_request_response = self.test_request_book_loan(book_id)
         
         if not success or not loan_request_response:
@@ -989,8 +1004,7 @@ class SchoolLibraryAPITester:
         loan_id = loan_request_response.get('loan_id')
         
         # Switch to admin and reject
-        print("\n🎓 Admin rejects the loan...")
-        user_token = self.token
+        print("\n🎓 Step 5: Admin rejects the loan...")
         
         admin_login_success, admin_info = self.test_school_admin_login()
         if not admin_login_success:
