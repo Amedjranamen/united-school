@@ -462,6 +462,24 @@ async def get_my_loans(current_user: User = Depends(get_current_user)):
     loans = await db.loans.find({"user_id": current_user.id}).to_list(length=None)
     return [Loan(**parse_from_mongo(loan)) for loan in loans]
 
+@api_router.get("/loans", response_model=List[Loan])
+async def get_all_loans(current_user: User = Depends(get_current_user)):
+    # Only admins and librarians can see all loans
+    if current_user.role not in [UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.LIBRARIAN]:
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+    
+    # School admins and librarians only see loans for books from their school
+    if current_user.role in [UserRole.SCHOOL_ADMIN, UserRole.LIBRARIAN]:
+        # Get all books from the user's school
+        school_books = await db.books.find({"school_id": current_user.school_id}).to_list(length=None)
+        book_ids = [book["id"] for book in school_books]
+        loans = await db.loans.find({"book_id": {"$in": book_ids}}).to_list(length=None)
+    else:
+        # Super admin can see all loans
+        loans = await db.loans.find({}).to_list(length=None)
+    
+    return [Loan(**parse_from_mongo(loan)) for loan in loans]
+
 @api_router.put("/loans/{loan_id}/status")
 async def update_loan_status(loan_id: str, status: LoanStatus, current_user: User = Depends(get_current_user)):
     loan = await db.loans.find_one({"id": loan_id})
