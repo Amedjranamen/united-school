@@ -147,7 +147,7 @@ backend:
 
   - task: "API gestion livres et exemplaires"
     implemented: true
-    working: false
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
@@ -159,6 +159,9 @@ backend:
         - working: false
           agent: "testing"
           comment: "❌ PROBLÈME CRITIQUE: Création livres (100%), listing (100%), CRUD (100%) OK, MAIS upload fichiers numériques ne fonctionne pas - les livres numériques n'ont pas de file_path après création, causant erreur 404 'Fichier non disponible'."
+        - working: true
+          agent: "testing"
+          comment: "✅ PROBLÈME RÉSOLU ET TESTÉ COMPLET: Upload fichiers numériques fonctionne parfaitement (100%). Tests focalisés confirmés: 1) Création livre numérique → upload PDF/EPUB → file_path mis à jour → download/serve endpoints fonctionnels (100%). 2) Edge cases: rejet formats invalides (.txt/.doc), protection unauthorized access, gestion livres inexistants (100%). 3) Investigation: 3 livres sans fichiers uploadés causent 404 (comportement normal), 2 livres avec fichiers fonctionnent parfaitement. CONCLUSION: L'API fonctionne correctement - les livres numériques DOIVENT avoir un fichier uploadé pour être téléchargeables."
 
   - task: "API système d'emprunts"
     implemented: true
