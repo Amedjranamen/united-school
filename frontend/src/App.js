@@ -156,6 +156,11 @@ const Header = () => {
                   Gérer les livres
                 </Link>
               )}
+              {['school_admin', 'librarian', 'super_admin'].includes(user.role) && (
+                <Link to="/manage-loans" className="text-gray-700 hover:text-emerald-600 transition-colors">
+                  Gérer les emprunts
+                </Link>
+              )}
               {user.role === 'super_admin' && (
                 <Link to="/admin" className="text-gray-700 hover:text-emerald-600 transition-colors">
                   Administration
