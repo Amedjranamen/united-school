@@ -1965,6 +1965,489 @@ const Catalogue = () => {
 
 
 
+// Manage Loans component
+const ManageLoans = () => {
+  const { user, token } = useAuth();
+  const { toast } = useToast();
+  const [loans, setLoans] = useState([]);
+  const [books, setBooks] = useState({});
+  const [users, setUsers] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('pending');
+
+  useEffect(() => {
+    fetchLoans();
+  }, [token]);
+
+  const fetchLoans = async () => {
+    try {
+      setLoading(true);
+      // Get all loans that need admin management
+      const loansResponse = await axios.get(`${API}/loans`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      const loansData = loansResponse.data;
+      setLoans(loansData);
+
+      // Fetch book and user details for each loan
+      const bookIds = [...new Set(loansData.map(loan => loan.book_id))];
+      const userIds = [...new Set(loansData.map(loan => loan.user_id))];
+
+      const [booksResponse, usersResponse] = await Promise.all([
+        Promise.all(bookIds.map(id => 
+          axios.get(`${API}/books/${id}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          }).catch(() => ({ data: { id, title: 'Livre supprimé', author: '' } }))
+        )),
+        Promise.all(userIds.map(id =>
+          axios.get(`${API}/users/${id}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          }).catch(() => ({ data: { id, full_name: 'Utilisateur supprimé', email: '' } }))
+        ))
+      ]);
+
+      const booksMap = {};
+      const usersMap = {};
+      
+      booksResponse.forEach(response => {
+        if (response.data) booksMap[response.data.id] = response.data;
+      });
+      
+      usersResponse.forEach(response => {
+        if (response.data) usersMap[response.data.id] = response.data;
+      });
+
+      setBooks(booksMap);
+      setUsers(usersMap);
+    } catch (error) {
+      console.error('Error fetching loans:', error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de charger les emprunts"
+      });
+    }
+    setLoading(false);
+  };
+
+  const updateLoanStatus = async (loanId, newStatus, adminNotes = '') => {
+    try {
+      await axios.put(`${API}/loans/${loanId}/status`, {
+        status: newStatus,
+        admin_notes: adminNotes
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      // Update local state
+      setLoans(loans.map(loan => 
+        loan.id === loanId ? { ...loan, status: newStatus, admin_notes: adminNotes } : loan
+      ));
+
+      toast({
+        title: "Statut mis à jour",
+        description: `L'emprunt a été ${newStatus === 'approved' ? 'approuvé' : newStatus === 'rejected' ? 'rejeté' : 'mis à jour'}`
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: error.response?.data?.detail || "Impossible de mettre à jour le statut"
+      });
+    }
+  };
+
+  const getStatusBadge = (status) => {
+    const statusConfig = {
+      'pending_approval': { color: 'bg-yellow-100 text-yellow-800', text: 'En attente' },
+      'approved': { color: 'bg-blue-100 text-blue-800', text: 'Approuvé' },
+      'borrowed': { color: 'bg-green-100 text-green-800', text: 'Emprunté' },
+      'returned': { color: 'bg-orange-100 text-orange-800', text: 'Retourné' },
+      'completed': { color: 'bg-emerald-100 text-emerald-800', text: 'Terminé' },
+      'rejected': { color: 'bg-red-100 text-red-800', text: 'Rejeté' },
+      'overdue': { color: 'bg-red-100 text-red-800', text: 'En retard' }
+    };
+    
+    const config = statusConfig[status] || { color: 'bg-gray-100 text-gray-800', text: status };
+    return <Badge className={config.color}>{config.text}</Badge>;
+  };
+
+  const pendingLoans = loans.filter(loan => loan.status === 'pending_approval');
+  const activeLoans = loans.filter(loan => ['approved', 'borrowed'].includes(loan.status));
+  const returnedLoans = loans.filter(loan => loan.status === 'returned');
+  const completedLoans = loans.filter(loan => ['completed', 'rejected'].includes(loan.status));
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Gestion des Emprunts</h1>
+        <p className="text-gray-600 mt-2">Validation et suivi des demandes d'emprunt</p>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <Calendar className="h-8 w-8 text-yellow-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">En attente</p>
+                <p className="text-2xl font-bold text-gray-900">{pendingLoans.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <Book className="h-8 w-8 text-blue-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Emprunts actifs</p>
+                <p className="text-2xl font-bold text-gray-900">{activeLoans.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <FileText className="h-8 w-8 text-orange-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">À valider (retours)</p>
+                <p className="text-2xl font-bold text-gray-900">{returnedLoans.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <CheckCircle className="h-8 w-8 text-green-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Terminés</p>
+                <p className="text-2xl font-bold text-gray-900">{completedLoans.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full max-w-2xl grid-cols-4">
+          <TabsTrigger value="pending">En attente ({pendingLoans.length})</TabsTrigger>
+          <TabsTrigger value="active">Actifs ({activeLoans.length})</TabsTrigger>
+          <TabsTrigger value="returned">Retours ({returnedLoans.length})</TabsTrigger>
+          <TabsTrigger value="completed">Terminés ({completedLoans.length})</TabsTrigger>
+        </TabsList>
+
+        {/* Pending Loans Tab */}
+        <TabsContent value="pending" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-yellow-600" />
+                Demandes d'emprunt en attente
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {pendingLoans.length === 0 ? (
+                <div className="text-center py-8">
+                  <CheckCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Aucune demande en attente</h3>
+                  <p className="text-gray-600">Toutes les demandes ont été traitées.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {pendingLoans.map((loan) => (
+                    <Card key={loan.id} className="border-l-4 border-l-yellow-400">
+                      <CardContent className="p-6">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-gray-900">
+                              {books[loan.book_id]?.title || 'Livre supprimé'}
+                            </h3>
+                            <p className="text-sm text-gray-600 mt-1">
+                              Par: {books[loan.book_id]?.author || 'Auteur inconnu'}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              Demandé par: {users[loan.user_id]?.full_name || 'Utilisateur supprimé'} 
+                              ({users[loan.user_id]?.email || ''})
+                            </p>
+                            <div className="mt-3 flex items-center gap-2">
+                              {getStatusBadge(loan.status)}
+                              <span className="text-xs text-gray-500">
+                                Demande du {new Date(loan.created_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 ml-4">
+                            <Button
+                              size="sm"
+                              onClick={() => updateLoanStatus(loan.id, 'approved')}
+                              className="bg-green-600 hover:bg-green-700"
+                            >
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              Approuver
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => updateLoanStatus(loan.id, 'rejected')}
+                              className="border-red-200 text-red-700 hover:bg-red-50"
+                            >
+                              <XCircle className="h-4 w-4 mr-1" />
+                              Rejeter
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Active Loans Tab */}
+        <TabsContent value="active" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Book className="h-5 w-5 text-blue-600" />
+                Emprunts actifs
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {activeLoans.length === 0 ? (
+                <div className="text-center py-8">
+                  <Book className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Aucun emprunt actif</h3>
+                  <p className="text-gray-600">Tous les livres sont disponibles.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {activeLoans.map((loan) => (
+                    <Card key={loan.id} className={`border-l-4 ${loan.status === 'approved' ? 'border-l-blue-400' : 'border-l-green-400'}`}>
+                      <CardContent className="p-6">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-gray-900">
+                              {books[loan.book_id]?.title || 'Livre supprimé'}
+                            </h3>
+                            <p className="text-sm text-gray-600 mt-1">
+                              Par: {books[loan.book_id]?.author || 'Auteur inconnu'}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              Emprunté par: {users[loan.user_id]?.full_name || 'Utilisateur supprimé'}
+                            </p>
+                            <div className="mt-3 flex items-center gap-2">
+                              {getStatusBadge(loan.status)}
+                              {loan.due_date && (
+                                <span className="text-xs text-gray-500">
+                                  Retour prévu: {new Date(loan.due_date).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex gap-2 ml-4">
+                            {loan.status === 'approved' && (
+                              <Button
+                                size="sm"
+                                onClick={() => updateLoanStatus(loan.id, 'borrowed')}
+                                className="bg-blue-600 hover:bg-blue-700"
+                              >
+                                <Book className="h-4 w-4 mr-1" />
+                                Marquer emprunté
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Returned Loans Tab */}
+        <TabsContent value="returned" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-orange-600" />
+                Livres retournés - Validation requise
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {returnedLoans.length === 0 ? (
+                <div className="text-center py-8">
+                  <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Aucun retour en attente</h3>
+                  <p className="text-gray-600">Tous les retours ont été validés.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {returnedLoans.map((loan) => (
+                    <Card key={loan.id} className="border-l-4 border-l-orange-400">
+                      <CardContent className="p-6">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-gray-900">
+                              {books[loan.book_id]?.title || 'Livre supprimé'}
+                            </h3>
+                            <p className="text-sm text-gray-600 mt-1">
+                              Par: {books[loan.book_id]?.author || 'Auteur inconnu'}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              Retourné par: {users[loan.user_id]?.full_name || 'Utilisateur supprimé'}
+                            </p>
+                            {loan.return_report && (
+                              <div className="mt-2 p-3 bg-gray-50 rounded">
+                                <p className="text-sm font-medium text-gray-700">Rapport de retour:</p>
+                                <p className="text-sm text-gray-600 mt-1">{loan.return_report}</p>
+                              </div>
+                            )}
+                            <div className="mt-3 flex items-center gap-2">
+                              {getStatusBadge(loan.status)}
+                              {loan.returned_at && (
+                                <span className="text-xs text-gray-500">
+                                  Retourné le: {new Date(loan.returned_at).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex gap-2 ml-4">
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                                  <CheckCircle className="h-4 w-4 mr-1" />
+                                  Valider retour
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Valider le retour du livre</DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-4">
+                                  <div>
+                                    <Label>Livre: {books[loan.book_id]?.title}</Label>
+                                  </div>
+                                  <div>
+                                    <Label>Utilisateur: {users[loan.user_id]?.full_name}</Label>
+                                  </div>
+                                  {loan.return_report && (
+                                    <div>
+                                      <Label>Rapport utilisateur:</Label>
+                                      <p className="text-sm text-gray-600 mt-1 p-2 bg-gray-50 rounded">{loan.return_report}</p>
+                                    </div>
+                                  )}
+                                  <div className="flex gap-2">
+                                    <Button 
+                                      className="flex-1 bg-green-600 hover:bg-green-700"
+                                      onClick={() => {
+                                        updateLoanStatus(loan.id, 'completed', 'Livre retourné en bon état');
+                                      }}
+                                    >
+                                      Livre en bon état
+                                    </Button>
+                                    <Button 
+                                      variant="outline"
+                                      className="flex-1"
+                                      onClick={() => {
+                                        updateLoanStatus(loan.id, 'completed', 'Livre retourné avec dommages mineurs');
+                                      }}
+                                    >
+                                      Dommages mineurs
+                                    </Button>
+                                  </div>
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Completed Loans Tab */}
+        <TabsContent value="completed" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                Emprunts terminés
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {completedLoans.length === 0 ? (
+                <div className="text-center py-8">
+                  <CheckCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Aucun emprunt terminé</h3>
+                  <p className="text-gray-600">L'historique apparaîtra ici.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {completedLoans.slice(0, 10).map((loan) => (
+                    <Card key={loan.id} className={`border-l-4 ${loan.status === 'completed' ? 'border-l-green-400' : 'border-l-red-400'}`}>
+                      <CardContent className="p-6">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-gray-900">
+                              {books[loan.book_id]?.title || 'Livre supprimé'}
+                            </h3>
+                            <p className="text-sm text-gray-600 mt-1">
+                              Par: {books[loan.book_id]?.author || 'Auteur inconnu'}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              Utilisateur: {users[loan.user_id]?.full_name || 'Utilisateur supprimé'}
+                            </p>
+                            {loan.admin_notes && (
+                              <p className="text-sm text-gray-600 mt-1">Notes: {loan.admin_notes}</p>
+                            )}
+                            <div className="mt-3 flex items-center gap-2">
+                              {getStatusBadge(loan.status)}
+                              <span className="text-xs text-gray-500">
+                                Terminé le {new Date(loan.created_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+};
+
+
 // Administration component
 const Administration = () => {
   const { token } = useAuth();
